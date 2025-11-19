@@ -1,0 +1,24 @@
+[project]
+name = "codeatlas"
+version = "0.1.0"
+description = "A service that downloads and indexes a code repository so developers can quickly ask natural-language questions about the code and get precise, context-aware answers."
+authors = [
+    {name = "Tatiana Maslennikova"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "ruff (>=0.14.5,<0.15.0)",
+    "mypy (>=1.18.2,<2.0.0)",
+    "pre-commit (>=4.4.0,<5.0.0)",
+    "isort (>=7.0.0,<8.0.0)"
+]
