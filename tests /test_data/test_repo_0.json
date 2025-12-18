@@ -1,0 +1,29 @@
+{
+    "url": "https://github.com/huggingface/pytorch-image-models",
+    "questions": [
+        {
+            "query": "В каких классах реализован механизм внимания в данном репозитории?",
+            "response": "Attention, AttentionRope"
+        },
+        {
+            "query": "Как запустить модель CSPResNet50 с предобученными весами?",
+            "response": "import timm\n model = timm.create_model('cspresnet50', pretrained=True)"
+        },
+        {
+            "query": "Где в данном репозитории находится код для модели HRNet?",
+            "response": "timm/models/hrnet.py"
+        },
+        {
+            "query": "Как экспортировать модель в формат ONNX?",
+            "response": "from timm.utils.onnx import onnx_export\n onnx_model = onnx_export(any_model, 'result_file.onnx', ...)"
+        },
+        {
+            "query": "Есть ли в данном репозитории реализации различных функций потерь?",
+            "response": "Да, например, AsymmetricLossMultiLabel, BinaryCrossEntropy, ..."
+        },
+        {
+            "query": "Как использовать этот репозиторий с LLamaFactory?",
+            "response": "Этого нельзя сделать, тк такого функционала нет в репозитории"
+        }
+    ]
+}

@@ -1,13 +1,24 @@
-.venv/
-
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
+*.so
 
-.mypy_cache/
-.ruff_cache/
-.pytest_cache/
+.venv/
+venv/
+env/
+ENV/
+
+.env
+.env.*
+.envrc
 
 .idea/
 .vscode/
 
+.DS_Store
 *.log
+
+neo4j/
+
+data/external/

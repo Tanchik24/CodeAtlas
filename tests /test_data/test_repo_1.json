@@ -1,0 +1,30 @@
+{
+    "url": "https://github.com/rwightman/pytorch-commands",
+    "questions": [
+        {
+            "query": "Как запустить данный репозиторий?",
+            "response": "python train.py path_to_data остальные параметры опциональны"
+        },
+        {
+            "query": "Какие модели есть в данном репозитории?",
+            "response": "DPN (dpn68, dpn92, dpn98, dpn131, dpn107), ResNet (resnet18, resnet34, resnet50, resnet101, resnet152), DenseNet (densenet121, densenet169, densenet201, densenet161), Wrn50_2"
+        },
+        {
+            "query": "Какую задачу решает автор репозитория?",
+            "response": "Speech Recognition, классификация голосовых команд"
+        },
+        {
+            "query": "Автор использовал готовые модели или писал их с нуля?",
+            "response": "Автор писал с нуля уже известные модели"
+        },
+        {
+            "query": "Пример кода создания Resnet модели",
+            
+            "response": "from models.my_resnet import ResNet, BasicBlock\n model = ResNet(BasicBlock, [2, 2, 2, 2], in_chs=3, num_classes=1000, drop_rate=0.0, block_drop_rate=0.0, global_pool='avg'):"
+        },
+        {
+            "query": "Какие форматы аудио файлов поддерживаются?",
+            "response": "Только .wav формат"
+        }
+    ]
+}

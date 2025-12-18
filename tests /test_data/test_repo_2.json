@@ -1,0 +1,21 @@
+{
+    "url": "https://github.com/alfitranurr/VISION-MEDICINE",
+    "questions": [
+        {
+            "query": "Какая фраза используется как тригер для голосового ассистента?",
+            "response": "Hey Eleven"
+        },
+        {
+            "query": "Where is and how this model deployed?",
+            "response": "It's deployed in docker container which interacts with n8n platform"
+        },
+        {
+            "query": "Какая модель детекции используется в данном репозитории?",
+            "response": "YOLO"
+        },
+        {
+            "query": "Какие технологии искусственного интеллекта используются в этом проекте?",
+            "response": "Computer Vision, Speach Recognition"
+        }
+    ]
+}
