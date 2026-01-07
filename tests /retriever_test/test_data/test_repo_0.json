@@ -1,0 +1,89 @@
+{
+  "url": "https://github.com/huggingface/pytorch-image-models",
+  "retrieval_questions": [
+    {
+      "query": "Где реализована функция create_model (timm.create_model) и как она выбирает модель по строковому имени?",
+      "gold_paths": ["timm/models/_factory.py"],
+      "gold_full_names": ["pytorch-image-models.timm.models._factory.create_model"]
+    },
+    {
+      "query": "Где находится реестр моделей и как работает register_model (и функции list_models / model_entrypoint)?",
+      "gold_paths": ["timm/models/_registry.py"],
+      "gold_full_names": [
+        "pytorch-image-models.timm.models._registry.register_model",
+        "pytorch-image-models.timm.models._registry.list_models",
+        "pytorch-image-models.timm.models._registry.model_entrypoint"
+      ]
+    },
+    {
+      "query": "Где в репозитории реализована модель HRNet (класс сети и entrypoint-функции для конкретных вариантов)?",
+      "gold_paths": ["timm/models/hrnet.py"],
+      "gold_full_names": [
+        "pytorch-image-models.timm.models.hrnet.HighResolutionNet",
+        "pytorch-image-models.timm.models.hrnet.hrnet_w18",
+        "pytorch-image-models.timm.models.hrnet.hrnet_w32"
+      ]
+    },
+    {
+      "query": "Где реализован self-attention для ViT (класс Attention и блоки трансформера)?",
+      "gold_paths": ["timm/models/vision_transformer.py"],
+      "gold_full_names": [
+        "pytorch-image-models.timm.models.vision_transformer.Attention",
+        "pytorch-image-models.timm.models.vision_transformer.Block"
+      ]
+    },
+    {
+      "query": "Где собирается датасет/даталоадер и конфиг данных: create_dataset, create_loader, resolve_data_config?",
+      "gold_paths": ["timm/data/dataset_factory.py", "timm/data/loader.py", "timm/data/config.py"],
+      "gold_full_names": [
+        "pytorch-image-models.timm.data.dataset_factory.create_dataset",
+        "pytorch-image-models.timm.data.loader.create_loader",
+        "pytorch-image-models.timm.data.config.resolve_data_config"
+      ]
+    },
+    {
+      "query": "Где реализованы MixUp/CutMix: Mixup, FastCollateMixup и функция mixup_target?",
+      "gold_paths": ["timm/data/mixup.py"],
+      "gold_full_names": [
+        "pytorch-image-models.timm.data.mixup.Mixup",
+        "pytorch-image-models.timm.data.mixup.FastCollateMixup",
+        "pytorch-image-models.timm.data.mixup.mixup_target"
+      ]
+    },
+    {
+      "query": "Где находятся реализации лоссов SoftTargetCrossEntropy, LabelSmoothingCrossEntropy и JsdCrossEntropy?",
+      "gold_paths": ["timm/loss/cross_entropy.py"],
+      "gold_full_names": [
+        "pytorch-image-models.timm.loss.cross_entropy.SoftTargetCrossEntropy",
+        "pytorch-image-models.timm.loss.cross_entropy.LabelSmoothingCrossEntropy",
+        "pytorch-image-models.timm.loss.cross_entropy.JsdCrossEntropy"
+      ]
+    },
+    {
+      "query": "Где реализован AsymmetricLossMultiLabel (или другие асимметричные лоссы для multilabel)?",
+      "gold_paths": ["timm/loss/asymmetric_loss.py"],
+      "gold_full_names": ["pytorch-image-models.timm.loss.asymmetric_loss.AsymmetricLossMultiLabel"]
+    },
+    {
+      "query": "Где реализована фабрика оптимизаторов create_optimizer_v2 и как формируются параметры через optimizer_kwargs?",
+      "gold_paths": ["timm/optim/optim_factory.py", "timm/optim/_optim_factory.py"],
+      "gold_full_names": [
+        "pytorch-image-models.timm.optim.optim_factory.create_optimizer_v2",
+        "pytorch-image-models.timm.optim.optim_factory.optimizer_kwargs"
+      ]
+    },
+    {
+      "query": "Где реализована фабрика шедулеров create_scheduler_v2 и как формируются параметры scheduler_kwargs?",
+      "gold_paths": ["timm/scheduler/scheduler_factory.py"],
+      "gold_full_names": [
+        "pytorch-image-models.timm.scheduler.scheduler_factory.create_scheduler_v2",
+        "pytorch-image-models.timm.scheduler.scheduler_factory.scheduler_kwargs"
+      ]
+    },
+    {
+      "query": "Где реализован CheckpointSaver и логика сохранения/ротации чекпойнтов при обучении?",
+      "gold_paths": ["timm/utils/checkpoint_saver.py"],
+      "gold_full_names": ["pytorch-image-models.timm.utils.checkpoint_saver.CheckpointSaver"]
+    }
+  ]
+}
