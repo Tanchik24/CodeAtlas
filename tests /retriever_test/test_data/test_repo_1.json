@@ -1,0 +1,76 @@
+{
+  "url": "https://github.com/rwightman/pytorch-commands",
+  "project_name": "pytorch-commands",
+  "retrieval_questions": [
+    {
+      "query": "Где реализована фабрика моделей create_model (по строковому имени, in_chs/num_classes/global_pool) для обучения/инференса?",
+      "gold_paths": ["models/model_factory.py"],
+      "gold_full_names": [
+        "pytorch-commands.models.model_factory.create_model"
+      ]
+    },
+    {
+      "query": "Где реализован основной Dataset для задачи Speech Commands (класс CommandsDataset), который используется в train/inference?",
+      "gold_paths": ["dataset.py"],
+      "gold_full_names": [
+        "pytorch-commands.dataset.CommandsDataset"
+      ]
+    },
+    {
+      "query": "Где находится функция, возвращающая список классов/лейблов датасета (get_labels), используемая для вычисления num_classes?",
+      "gold_paths": ["dataset.py"],
+      "gold_full_names": [
+        "pytorch-commands.dataset.get_labels"
+      ]
+    },
+    {
+      "query": "Где реализован метод CommandsDataset.__getitem__ (выдача (input,target) для DataLoader), который формирует вход для модели?",
+      "gold_paths": ["dataset.py"],
+      "gold_full_names": [
+        "pytorch-commands.dataset.CommandsDataset.__getitem__"
+      ]
+    },
+    {
+      "query": "Где реализован метод CommandsDataset.__len__ (размер датасета), который нужен DataLoader/самплеру?",
+      "gold_paths": ["dataset.py"],
+      "gold_full_names": [
+        "pytorch-commands.dataset.CommandsDataset.__len__"
+      ]
+    },
+    {
+      "query": "Где реализован метод CommandsDataset.filename(index), который возвращает имя файла семпла и используется при сохранении submission/results?",
+      "gold_paths": ["dataset.py"],
+      "gold_full_names": [
+        "pytorch-commands.dataset.CommandsDataset.filename"
+      ]
+    },
+    {
+      "query": "Где реализован основной train loop за одну эпоху (train_epoch), который делает forward/backward/optimizer.step?",
+      "gold_paths": ["train.py"],
+      "gold_full_names": [
+        "pytorch-commands.train.train_epoch"
+      ]
+    },
+    {
+      "query": "Где реализована функция валидации (validate), которая считает метрики/лосс на val и логирует результат?",
+      "gold_paths": ["train.py"],
+      "gold_full_names": [
+        "pytorch-commands.train.validate"
+      ]
+    },
+    {
+      "query": "Где реализована логика инференса (main в inference.py), которая загружает чекпойнт, прогоняет модель и пишет submission.csv?",
+      "gold_paths": ["inference.py"],
+      "gold_full_names": [
+        "pytorch-commands.inference.main"
+      ]
+    },
+    {
+      "query": "Где реализован Triplet Loss (класс TripletLoss) для triplet-тренинга и его forward-логика выбора pos/neg?",
+      "gold_paths": ["triplet_loss.py"],
+      "gold_full_names": [
+        "pytorch-commands.triplet_loss.TripletLoss"
+      ]
+    }
+  ]
+}

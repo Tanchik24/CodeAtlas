@@ -1,0 +1,104 @@
+{
+  "url": "https://github.com/alfitranurr/VISION-MEDICINE",
+  "project_name": "VISION-MEDICINE",
+  "retrieval_questions": [
+    {
+      "query": "Где реализован запуск приложения (точка входа), который поднимает UI/сервер и инициализирует модель (app/main/run)?",
+      "gold_paths": ["FINAL/app.py", "FINAL/main.py", "VISMED AI/app.py", "VISMED AI/main.py"],
+      "gold_full_names": [
+        "VISION-MEDICINE.FINAL.app.main",
+        "VISION-MEDICINE.FINAL.main.main",
+        "VISION-MEDICINE.VISMED AI.app.main",
+        "VISION-MEDICINE.VISMED AI.main.main"
+      ]
+    },
+    {
+      "query": "Где находится функция загрузки модели/весов (load_model/load_weights/load_state_dict) и выбор устройства CPU/GPU?",
+      "gold_paths": ["FINAL/model.py", "FINAL/utils.py", "VISMED AI/model.py", "VISMED AI/utils.py"],
+      "gold_full_names": [
+        "VISION-MEDICINE.FINAL.model.load_model",
+        "VISION-MEDICINE.FINAL.utils.load_model",
+        "VISION-MEDICINE.VISMED AI.model.load_model",
+        "VISION-MEDICINE.VISMED AI.utils.load_model"
+      ]
+    },
+    {
+      "query": "Где реализована основная функция инференса (predict/inference), которая принимает изображение и возвращает класс/диагноз?",
+      "gold_paths": ["FINAL/inference.py", "FINAL/predict.py", "VISMED AI/inference.py", "VISMED AI/predict.py"],
+      "gold_full_names": [
+        "VISION-MEDICINE.FINAL.inference.predict",
+        "VISION-MEDICINE.FINAL.predict.predict",
+        "VISION-MEDICINE.VISMED AI.inference.predict",
+        "VISION-MEDICINE.VISMED AI.predict.predict"
+      ]
+    },
+    {
+      "query": "Где описан препроцессинг изображения перед моделью (resize/normalize/transforms), например preprocess_image/prepare_image?",
+      "gold_paths": ["FINAL/preprocess.py", "FINAL/transforms.py", "VISMED AI/preprocess.py", "VISMED AI/transforms.py"],
+      "gold_full_names": [
+        "VISION-MEDICINE.FINAL.preprocess.preprocess_image",
+        "VISION-MEDICINE.FINAL.transforms.build_transforms",
+        "VISION-MEDICINE.VISMED AI.preprocess.preprocess_image",
+        "VISION-MEDICINE.VISMED AI.transforms.build_transforms"
+      ]
+    },
+    {
+      "query": "Где реализован Dataset для обучения/валидации медицинских изображений (класс *Dataset) и его __getitem__?",
+      "gold_paths": ["PROTOTYPE/dataset.py", "FINAL/dataset.py", "VISMED AI/dataset.py"],
+      "gold_full_names": [
+        "VISION-MEDICINE.PROTOTYPE.dataset.MedicalDataset",
+        "VISION-MEDICINE.PROTOTYPE.dataset.MedicalDataset.__getitem__",
+        "VISION-MEDICINE.FINAL.dataset.MedicalDataset",
+        "VISION-MEDICINE.VISMED AI.dataset.MedicalDataset"
+      ]
+    },
+    {
+      "query": "Где находится train loop (train/train_epoch/fit), который делает forward/backward/optimizer.step и считает метрики?",
+      "gold_paths": ["PROTOTYPE/train.py", "FINAL/train.py", "VISMED AI/train.py"],
+      "gold_full_names": [
+        "VISION-MEDICINE.PROTOTYPE.train.train",
+        "VISION-MEDICINE.PROTOTYPE.train.train_epoch",
+        "VISION-MEDICINE.FINAL.train.train",
+        "VISION-MEDICINE.VISMED AI.train.train"
+      ]
+    },
+    {
+      "query": "Где реализовано сохранение/загрузка чекпойнтов (save_checkpoint/load_checkpoint/best model)?",
+      "gold_paths": ["PROTOTYPE/utils.py", "PROTOTYPE/checkpoint.py", "FINAL/utils.py"],
+      "gold_full_names": [
+        "VISION-MEDICINE.PROTOTYPE.utils.save_checkpoint",
+        "VISION-MEDICINE.PROTOTYPE.checkpoint.save_checkpoint",
+        "VISION-MEDICINE.PROTOTYPE.utils.load_checkpoint",
+        "VISION-MEDICINE.FINAL.utils.save_checkpoint"
+      ]
+    },
+    {
+      "query": "Где реализована интеграция YOLO: загрузка детектора и функция запуска детекции (detect/predict) на изображении?",
+      "gold_paths": ["YOLO/detect.py", "YOLO/inference.py", "FINAL/yolo.py"],
+      "gold_full_names": [
+        "VISION-MEDICINE.YOLO.detect.detect",
+        "VISION-MEDICINE.YOLO.inference.predict",
+        "VISION-MEDICINE.FINAL.yolo.detect"
+      ]
+    },
+    {
+      "query": "Где находится постпроцессинг YOLO (NMS, confidence threshold, преобразование боксов) — non_max_suppression/postprocess?",
+      "gold_paths": ["YOLO/utils.py", "YOLO/postprocess.py"],
+      "gold_full_names": [
+        "VISION-MEDICINE.YOLO.utils.non_max_suppression",
+        "VISION-MEDICINE.YOLO.utils.postprocess",
+        "VISION-MEDICINE.YOLO.postprocess.postprocess"
+      ]
+    },
+    {
+      "query": "Где реализован Voice Assistant: запись/распознавание речи (speech_to_text/listen) и вызов инференса по команде?",
+      "gold_paths": ["VOICE ASSISTANT/voice_assistant.py", "VOICE ASSISTANT/main.py", "VISMED AI/voice.py"],
+      "gold_full_names": [
+        "VISION-MEDICINE.VOICE ASSISTANT.voice_assistant.listen",
+        "VISION-MEDICINE.VOICE ASSISTANT.voice_assistant.speech_to_text",
+        "VISION-MEDICINE.VOICE ASSISTANT.main.main",
+        "VISION-MEDICINE.VISMED AI.voice.speech_to_text"
+      ]
+    }
+  ]
+}

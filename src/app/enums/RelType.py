@@ -1,0 +1,13 @@
+from __future__ import annotations
+
+from enum import Enum
+
+
+class RelType(str, Enum):
+    CONTAINS_PACKAGE = 'CONTAINS_PACKAGE'
+    CONTAINS_FOLDER = 'CONTAINS_FOLDER'
+    CONTAINS_MODUL = 'CONTAINS_MODUL'
+    DEFINES_CLASS = "DEFINES_CLASS"
+    DEFINES_METHOD = "DEFINES_METHOD"
+    DEFINES_FUNCTION = "DEFINES_FUNCTION"
+    IMPORTS = "IMPORTS"

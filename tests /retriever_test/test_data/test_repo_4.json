@@ -1,0 +1,56 @@
+{
+  "url": "https://github.com/subarnasaikia/Tic-Tac-Toe",
+  "project_name": "Tic-Tac-Toe",
+  "retrieval_questions": [
+    {
+      "query": "Где определён основной класс игры (Game) в неймспейсе TTT, который управляет процессом Tic-Tac-Toe?",
+      "gold_paths": ["include/game.h", "src/game.cpp"],
+      "gold_full_names": ["Tic-Tac-Toe.include.game.TTT.Game"]
+    },
+    {
+      "query": "Где реализован основной игровой цикл (метод run), который запускает игру и крутит ходы игроков?",
+      "gold_paths": ["include/game.h", "src/game.cpp"],
+      "gold_full_names": ["Tic-Tac-Toe.include.game.TTT.Game.run"]
+    },
+    {
+      "query": "Где реализована логика хода игрока (метод _playerTurn): ввод координат/проверки/попытка сделать ход?",
+      "gold_paths": ["include/game.h", "src/game.cpp"],
+      "gold_full_names": ["Tic-Tac-Toe.include.game.TTT.Game._playerTurn"]
+    },
+    {
+      "query": "Где реализовано переключение текущего игрока (метод _changePlayer), которое меняет active player/symbol?",
+      "gold_paths": ["include/game.h", "src/game.cpp"],
+      "gold_full_names": ["Tic-Tac-Toe.include.game.TTT.Game._changePlayer"]
+    },
+    {
+      "query": "Где реализовано формирование результата/кода завершения игры (метод _result), который определяет победу/ничью?",
+      "gold_paths": ["include/game.h", "src/game.cpp"],
+      "gold_full_names": ["Tic-Tac-Toe.include.game.TTT.Game._result"]
+    },
+    {
+      "query": "Где определён класс доски (Board) в TTT, который хранит состояние поля и предоставляет операции над ним?",
+      "gold_paths": ["include/board.h", "src/board.cpp"],
+      "gold_full_names": ["Tic-Tac-Toe.include.board.TTT.Board"]
+    },
+    {
+      "query": "Где реализована проверка победы (метод Board.checkWin), которая определяет выигрышные линии?",
+      "gold_paths": ["include/board.h", "src/board.cpp"],
+      "gold_full_names": ["Tic-Tac-Toe.include.board.TTT.Board.checkWin"]
+    },
+    {
+      "query": "Где реализована проверка ничьей (метод Board.checkDraw), когда ходов больше нет и победителя нет?",
+      "gold_paths": ["include/board.h", "src/board.cpp"],
+      "gold_full_names": ["Tic-Tac-Toe.include.board.TTT.Board.checkDraw"]
+    },
+    {
+      "query": "Где реализовано выполнение хода на доске (метод Board.makeMove), который ставит символ по координатам и валидирует ход?",
+      "gold_paths": ["include/board.h", "src/board.cpp"],
+      "gold_full_names": ["Tic-Tac-Toe.include.board.TTT.Board.makeMove"]
+    },
+    {
+      "query": "Где реализована печать ASCII-логотипа (функция logo), которая рисует стартовую заставку игры?",
+      "gold_paths": ["include/logo.h", "src/logo.cpp"],
+      "gold_full_names": ["Tic-Tac-Toe.src.logo.logo", "Tic-Tac-Toe.include.logo.logo"]
+    }
+  ]
+}
