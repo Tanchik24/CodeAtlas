@@ -6,6 +6,7 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional, Tuple
+import pandas as pd
 
 
 from src.app.config import get_config
@@ -36,7 +37,7 @@ class RetrieverTest:
     def __init__(self) -> None:
         self.config = get_config()
         self.test_data_dir = Path(self.config.gdb.retriever_test_dir).resolve()
-        self.repos_root = Path(self.config.gdb.repos_dir).resolve()
+        self.repos_root = Path(self.config.gdb.retriever_test_repos_dir).resolve()
         self.qdrant_path = Path(self.config.gdb.qdrant_path).resolve()
 
         self.language_registry = LanguageRegistry()
@@ -155,7 +156,23 @@ class RetrieverTest:
         except Exception:
             pass
 
+        self._save_metrics(per_repo, overall)
+
         return per_repo, overall
+    
+    def _save_metrics(self, per_repo: dict[str, dict[str, float]], overall: dict[str, float]) -> None:
+        try:
+            out_dir = self.test_data_dir.parent 
+
+            df_per_repo = pd.DataFrame.from_dict(per_repo, orient="index").reset_index()
+            df_per_repo = df_per_repo.rename(columns={"index": "repo"})
+            df_per_repo.to_csv(out_dir / "per_repo_metrics.csv", index=False)
+
+            df_overall = pd.DataFrame([overall])
+            df_overall.to_csv(out_dir / "overall_metrics.csv", index=False)
+
+        except Exception:
+            pass
 
     @staticmethod
     def _mrr_at_k(golden: list[str], retrieved: list[str]) -> float:

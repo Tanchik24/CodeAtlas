@@ -20,5 +20,5 @@ class DBConfig(BaseSettings):
 
     qdrant_path: str = Field("./.qdrant_code_embeddings")
 
-    repos_dir: str = Field("./repos")
+    retriever_test_repos_dir: str = Field("./tests/retriever_test/repos")
     retriever_test_dir: str = Field("./tests/retriever_test/test_data")
