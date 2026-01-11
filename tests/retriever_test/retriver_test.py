@@ -346,3 +346,7 @@ class RetrieverTest:
             except Exception:
                 return str(value)
         return str(value)
+
+
+if __name__ == "__main__":
+    RetrieverTest().run()
