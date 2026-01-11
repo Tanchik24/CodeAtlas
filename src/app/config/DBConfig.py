@@ -22,3 +22,5 @@ class DBConfig(BaseSettings):
 
     retriever_test_repos_dir: str = Field("./tests/retriever_test/repos")
     retriever_test_dir: str = Field("./tests/retriever_test/test_data")
+    rag_test_dir: str = Field("./tests/rag_test/test_data")
+    rag_test_repos_dir: str = Field("./tests/rag_test/repos")
