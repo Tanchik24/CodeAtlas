@@ -47,9 +47,10 @@ Be VERY concise: max 3–6 bullet points, no fluff.
 Tools:
 1) semantic_search(question_text, top_k) -> hits with payload (often includes path + start_line/end_line)
 2) graph_query_readonly(cypher_query, params) -> rows (read-only)
+3) read_file_span(relative_path, start_line, end_line) -> exact snippet by lines
 
 Policy / workflow:
-- If the user needs exact code or exact behavior: semantic_search.
+- If the user needs exact code or exact behavior: semantic_search -> read_file_span.
 - Use graph_query_readonly only if you must:
   - payload misses path/lines, OR
   - you need relations (imports/defines/contains).
@@ -182,6 +183,63 @@ class SemanticSearchToolBackend:
         return _dump_json_limited({"ok": True, "hits": output_hits[:effective_top_k]}, self._max_tool_output_characters)
 
 
+class FileSpanReaderToolBackend:
+
+    def __init__(self, repository_root_directory: Path, max_tool_output_characters: int, max_file_snippet_characters: int) -> None:
+        self._repository_root_directory = repository_root_directory
+        self._max_tool_output_characters = int(max_tool_output_characters)
+        self._max_file_snippet_characters = int(max_file_snippet_characters)
+
+    def read_file_span(self, relative_path: str, start_line: int, end_line: int) -> str:
+        rel = str(relative_path or "").strip()
+        if not rel:
+            return _dump_json_limited({"ok": False, "error": "empty relative_path"}, self._max_tool_output_characters)
+
+        try:
+            s = int(start_line)
+            e = int(end_line)
+        except Exception:
+            return _dump_json_limited({"ok": False, "error": "start_line/end_line must be integers"}, self._max_tool_output_characters)
+
+        if s <= 0 or e <= 0 or e < s:
+            return _dump_json_limited({"ok": False, "error": "invalid line range"}, self._max_tool_output_characters)
+
+        try:
+            full_path = _enforce_repository_root(self._repository_root_directory, rel)
+            if not full_path.is_file():
+                return _dump_json_limited({"ok": False, "error": f"file not found: {rel}"}, self._max_tool_output_characters)
+        except Exception as exc:
+            return _dump_json_limited({"ok": False, "error": f"path error: {exc}"}, self._max_tool_output_characters)
+
+        lines: List[str] = []
+        try:
+            with full_path.open("r", encoding="utf-8", errors="replace") as f:
+                for ln, text in enumerate(f, start=1):
+                    if ln < s:
+                        continue
+                    if ln > e:
+                        break
+                    lines.append(text)
+        except Exception as exc:
+            return _dump_json_limited({"ok": False, "error": f"file read error: {exc}"}, self._max_tool_output_characters)
+
+        snippet = "".join(lines)
+        truncated = False
+        if len(snippet) > self._max_file_snippet_characters:
+            snippet = snippet[: self._max_file_snippet_characters] + "\n# ... truncated ..."
+            truncated = True
+
+        payload = {
+            "ok": True,
+            "relative_path": rel,
+            "start_line": s,
+            "end_line": e,
+            "truncated": truncated,
+            "text": snippet,
+        }
+        return _dump_json_limited(payload, self._max_tool_output_characters)
+
+
 class CodeRepositoryLangGraphAgent:
     def __init__(self, configuration: RepositoryAgentConfiguration, neo4j_ingestor: Any, embedder: Any) -> None:
         if create_react_agent is None:
@@ -201,6 +259,11 @@ class CodeRepositoryLangGraphAgent:
             semantic_top_k_default=configuration.semantic_top_k_default,
             max_tool_output_characters=configuration.max_tool_output_characters,
         )
+        file_backend = FileSpanReaderToolBackend(
+            repository_root_directory=configuration.repository_root_directory,
+            max_tool_output_characters=configuration.max_tool_output_characters,
+            max_file_snippet_characters=configuration.max_file_snippet_characters,
+        )
 
         tools: List[StructuredTool] = [
             StructuredTool.from_function(
@@ -212,8 +275,15 @@ class CodeRepositoryLangGraphAgent:
                 func=semantic_backend.semantic_search,
                 name="semantic_search",
                 description="Semantic search over code entities. Returns node_id + payload.",
-            )
+            ),
+            StructuredTool.from_function(
+                func=file_backend.read_file_span,
+                name="read_file_span",
+                description="Read repository file by line range (1-based, inclusive). Returns JSON with exact text.",
+            ),
         ]
+
+        
 
         chat_model = ChatMistralAI(
             model=str(configuration.mistral_model_name),
