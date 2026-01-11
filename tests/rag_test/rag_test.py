@@ -8,6 +8,7 @@ from typing import Optional, Any, Tuple
 
 import pandas as pd
 from pydantic import BaseModel, conint
+from dotenv import load_dotenv
 from langchain_mistralai import ChatMistralAI
 
 from src.app.config import get_config
@@ -17,6 +18,9 @@ from src.services.CodeEmbeddingsStore import CodeEmbeddingsStore
 from src.app.entities import Project
 from src.app.code_indexer.CodebaseIndexer import CodebaseIndexer
 from src.app.rag.agent import CodeRepoToolAgent
+
+
+load_dotenv()
 
 
 @dataclass
