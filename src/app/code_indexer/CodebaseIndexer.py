@@ -24,11 +24,17 @@ class CodebaseIndexer:
         neo4j_ingestor: Neo4jIngestor,
         language_registry: LanguageRegistry,
         emb_store: CodeEmbeddingsStore,
+        emb_config: RepositoryEmbeddingConfig | None = None
     ) -> None:
         self.project: Project = project
         self.neo4j_ingestor: Neo4jIngestor = neo4j_ingestor
         self.language_registry: LanguageRegistry = language_registry
         self.emb_store: CodeEmbeddingsStore = emb_store
+        self.emb_config = emb_config or RepositoryEmbeddingConfig(
+                    use_cuda=True,
+                    indexing_batch_size=32,
+                    max_source_code_characters=5120,
+                )
 
         self.embedder: Optional[CodeEmbeddingsGenerator] = None
         self.graph_builder: GraphBuilder | None = None
@@ -80,11 +86,7 @@ class CodebaseIndexer:
                 embeddings_store=self.emb_store,
                 neo4j_connection=self.neo4j_ingestor._conn,
                 project_name=self.project.name,
-                config=RepositoryEmbeddingConfig(
-                    use_cuda=True,
-                    indexing_batch_size=32,
-                    max_source_code_characters=5120,
-                ),
+                config=self.emb_config,
             )
 
             stats = self.embedder.generate_all()

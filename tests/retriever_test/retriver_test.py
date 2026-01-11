@@ -15,7 +15,7 @@ from src.app.entities import Project
 from src.services.CodeEmbeddingsStore import CodeEmbeddingsStore
 from src.services.Neo4jIngestor import Neo4jIngestor
 from src.app.code_indexer.CodebaseIndexer import CodebaseIndexer
-
+from src.app.code_embedder.CodeEmbeddingsGenerator import RepositoryEmbeddingConfig
 
 @dataclass
 class Question:
@@ -46,109 +46,135 @@ class RetrieverTest:
         self.neo4j = Neo4jIngestor()
         self.top_k = 5
 
-    def run(self) -> Tuple[dict[str, dict[str, float]], dict[str, float]]:
+    def run(self) -> Tuple[dict[str, dict[str, dict[str, float]]], dict[str, dict[str, float]]]:
         self._ensure_dirs_exist()
 
+        embedding_models = [
+            "jinaai/jina-embeddings-v2-base-code",
+            "BAAI/bge-small-en-v1.5",
+            "sentence-transformers/all-MiniLM-L6-v2",
+        ]
+
         repos = self._load_test_files()
-        per_repo: dict[str, dict[str, float]] = {}
 
-        overall_lists: dict[str, list[float]] = {
-            "avg_recall@k_path": [],
-            "avg_recall@k_full_name": [],
-            "avg_mrr@k_path": [],
-            "avg_mrr@k_full_name": [],
-            "avg_ndcg@k_path": [],
-            "avg_ndcg@k_full_name": [],
-            "avg_search_latency_s": [],
-            "index_latency_s": [],
-            "n_questions": [],
-        }
+        per_repo_by_model: dict[str, dict[str, dict[str, float]]] = {}
+        overall_by_model: dict[str, dict[str, float]] = {}
 
-        for repo in repos:
-            repo.path = self._ensure_repo_cloned(repo.url, repo.name)
-            repo.collection = self._collection_name(repo.url)
+        details_rows: list[dict[str, Any]] = []
 
-            self._reset_repo_index(repo)
-            t0_idx = time.perf_counter()
-            embedder = self._index_repo(repo)
-            index_latency_s = time.perf_counter() - t0_idx
+        for dense_model_name in embedding_models:
+            per_repo: dict[str, dict[str, float]] = {}
 
-            recall_paths: list[float] = []
-            recall_full_names: list[float] = []
-            mrr_paths: list[float] = []
-            mrr_full_names: list[float] = []
-            ndcg_paths: list[float] = []
-            ndcg_full_names: list[float] = []
-
-            search_latencies_s: list[float] = []
-
-            for question in repo.questions:
-                q_text = (question.text or "").strip()
-                if not q_text:
-                    continue
-
-                t0 = time.perf_counter()
-                hits = embedder.search_question(question_text=q_text, top_k=self.top_k) or []
-                search_latencies_s.append(time.perf_counter() - t0)
-
-                paths: list[str] = []
-                full_names: list[str] = []
-
-                for _, _, payload in hits:
-                    payload = self._to_jsonable(payload or {})
-                    path = str(payload.get("path") or "").strip()
-                    full_name = str(payload.get("full_name") or "").strip()
-                    if path:
-                        paths.append(path)
-                    if full_name:
-                        full_names.append(full_name)
-
-                recall_paths.append(self._recall_at_k(question.gold_paths, paths))
-                recall_full_names.append(self._recall_at_k(question.gold_full_names, full_names))
-
-                mrr_paths.append(self._mrr_at_k(question.gold_paths, paths))
-                mrr_full_names.append(self._mrr_at_k(question.gold_full_names, full_names))
-
-                ndcg_paths.append(self._ndcg_at_k(question.gold_paths, paths, self.top_k))
-                ndcg_full_names.append(self._ndcg_at_k(question.gold_full_names, full_names, self.top_k))
-
-            n_q = len(repo.questions)
-            denom = max(1, n_q)
-
-            avg_search_latency_s = float(sum(search_latencies_s) / len(search_latencies_s)) if search_latencies_s else 0.0
-
-            metrics = {
-                "n_questions": float(n_q),
-
-                "avg_recall@k_path": float(sum(recall_paths) / denom) if recall_paths else 0.0,
-                "avg_recall@k_full_name": float(sum(recall_full_names) / denom) if recall_full_names else 0.0,
-
-                "avg_mrr@k_path": float(sum(mrr_paths) / denom) if mrr_paths else 0.0,
-                "avg_mrr@k_full_name": float(sum(mrr_full_names) / denom) if mrr_full_names else 0.0,
-
-                "avg_ndcg@k_path": float(sum(ndcg_paths) / denom) if ndcg_paths else 0.0,
-                "avg_ndcg@k_full_name": float(sum(ndcg_full_names) / denom) if ndcg_full_names else 0.0,
-
-                "avg_search_latency_s": avg_search_latency_s,
-                "index_latency_s": float(index_latency_s),
+            overall_lists: dict[str, list[float]] = {
+                "avg_recall@k_path": [],
+                "avg_recall@k_full_name": [],
+                "avg_mrr@k_path": [],
+                "avg_mrr@k_full_name": [],
+                "avg_ndcg@k_path": [],
+                "avg_ndcg@k_full_name": [],
+                "avg_search_latency_s": [],
+                "index_latency_s": [],
+                "n_questions": [],
             }
 
-            per_repo[repo.name] = metrics
+            for repo in repos:
+                repo.path = self._ensure_repo_cloned(repo.url, repo.name)
+                repo.collection = self._collection_name(repo.url)
 
-            try:
                 self._reset_repo_index(repo)
-            except Exception:
-                pass
+                t0_idx = time.perf_counter()
+                embedder = self._index_repo(repo, dense_model_name=dense_model_name) 
+                index_latency_s = time.perf_counter() - t0_idx
 
-            for k, v in metrics.items():
-                if k in overall_lists:
-                    overall_lists[k].append(float(v))
+                recall_paths: list[float] = []
+                recall_full_names: list[float] = []
+                mrr_paths: list[float] = []
+                mrr_full_names: list[float] = []
+                ndcg_paths: list[float] = []
+                ndcg_full_names: list[float] = []
 
-        overall: dict[str, float] = {}
-        for k, xs in overall_lists.items():
-            overall[k] = float(sum(xs) / len(xs)) if xs else 0.0
+                search_latencies_s: list[float] = []
 
-        overall["n_repos"] = float(len(per_repo))
+                for question in repo.questions:
+                    q_text = (question.text or "").strip()
+                    if not q_text:
+                        continue
+
+                    t0 = time.perf_counter()
+                    hits = embedder.search_question(question_text=q_text, top_k=self.top_k) or []
+                    search_latencies_s.append(time.perf_counter() - t0)
+
+                    paths: list[str] = []
+                    full_names: list[str] = []
+
+                    for _, _, payload in hits:
+                        payload = self._to_jsonable(payload or {})
+                        path = str(payload.get("path") or "").strip()
+                        full_name = str(payload.get("full_name") or "").strip()
+                        if path:
+                            paths.append(path)
+                        if full_name:
+                            full_names.append(full_name)
+
+                    details_rows.append({
+                        "model": dense_model_name,
+                        "repo": repo.name,
+                        "question": q_text,
+                        "gold_paths": json.dumps([str(x).strip() for x in (question.gold_paths or []) if str(x).strip()], ensure_ascii=False),
+                        "retrieved_paths": json.dumps(paths, ensure_ascii=False),
+                        "gold_full_names": json.dumps([str(x).strip() for x in (question.gold_full_names or []) if str(x).strip()], ensure_ascii=False),
+                        "retrieved_full_names": json.dumps(full_names, ensure_ascii=False),
+                    })
+
+                    recall_paths.append(self._recall_at_k(question.gold_paths, paths))
+                    recall_full_names.append(self._recall_at_k(question.gold_full_names, full_names))
+
+                    mrr_paths.append(self._mrr_at_k(question.gold_paths, paths))
+                    mrr_full_names.append(self._mrr_at_k(question.gold_full_names, full_names))
+
+                    ndcg_paths.append(self._ndcg_at_k(question.gold_paths, paths, self.top_k))
+                    ndcg_full_names.append(self._ndcg_at_k(question.gold_full_names, full_names, self.top_k))
+
+                n_q = len(repo.questions)
+                denom = max(1, n_q)
+
+                avg_search_latency_s = float(sum(search_latencies_s) / len(search_latencies_s)) if search_latencies_s else 0.0
+
+                metrics = {
+                    "n_questions": float(n_q),
+
+                    "avg_recall@k_path": float(sum(recall_paths) / denom) if recall_paths else 0.0,
+                    "avg_recall@k_full_name": float(sum(recall_full_names) / denom) if recall_full_names else 0.0,
+
+                    "avg_mrr@k_path": float(sum(mrr_paths) / denom) if mrr_paths else 0.0,
+                    "avg_mrr@k_full_name": float(sum(mrr_full_names) / denom) if mrr_full_names else 0.0,
+
+                    "avg_ndcg@k_path": float(sum(ndcg_paths) / denom) if ndcg_paths else 0.0,
+                    "avg_ndcg@k_full_name": float(sum(ndcg_full_names) / denom) if ndcg_full_names else 0.0,
+
+                    "avg_search_latency_s": avg_search_latency_s,
+                    "index_latency_s": float(index_latency_s),
+                }
+
+                per_repo[repo.name] = metrics
+
+                try:
+                    self._reset_repo_index(repo)
+                except Exception:
+                    pass
+
+                for k, v in metrics.items():
+                    if k in overall_lists:
+                        overall_lists[k].append(float(v))
+
+            overall: dict[str, float] = {}
+            for k, xs in overall_lists.items():
+                overall[k] = float(sum(xs) / len(xs)) if xs else 0.0
+
+            overall["n_repos"] = float(len(per_repo))
+
+            per_repo_by_model[dense_model_name] = per_repo
+            overall_by_model[dense_model_name] = overall
 
         try:
             import shutil
@@ -156,20 +182,49 @@ class RetrieverTest:
         except Exception:
             pass
 
-        self._save_metrics(per_repo, overall)
+        self._save_metrics(per_repo_by_model, overall_by_model, details_rows)
 
-        return per_repo, overall
+        return per_repo_by_model, overall_by_model
     
-    def _save_metrics(self, per_repo: dict[str, dict[str, float]], overall: dict[str, float]) -> None:
+    def _save_metrics(
+        self,
+        per_repo_by_model: dict[str, dict[str, dict[str, float]]],
+        overall_by_model: dict[str, dict[str, float]],
+        details_rows: list[dict[str, Any]],
+    ) -> None:
         try:
-            out_dir = self.test_data_dir.parent 
+            out_dir = self.test_data_dir.parent
 
-            df_per_repo = pd.DataFrame.from_dict(per_repo, orient="index").reset_index()
-            df_per_repo = df_per_repo.rename(columns={"index": "repo"})
-            df_per_repo.to_csv(out_dir / "per_repo_metrics.csv", index=False)
+            per_repo_rows: list[dict[str, Any]] = []
+            for model_name, per_repo in (per_repo_by_model or {}).items():
+                for repo_name, metrics in (per_repo or {}).items():
+                    per_repo_rows.append({
+                        "model": model_name,
+                        "repo": repo_name,
+                        **(metrics or {}),
+                    })
 
-            df_overall = pd.DataFrame([overall])
-            df_overall.to_csv(out_dir / "overall_metrics.csv", index=False)
+            df_per_repo = pd.DataFrame(per_repo_rows)
+            if not df_per_repo.empty:
+                df_per_repo = df_per_repo.set_index(["model", "repo"]).sort_index()
+            df_per_repo.to_csv(out_dir / "per_repo_metrics.csv", index=True)
+
+            overall_rows: list[dict[str, Any]] = []
+            for model_name, metrics in (overall_by_model or {}).items():
+                overall_rows.append({
+                    "model": model_name,
+                    **(metrics or {}),
+                })
+
+            df_overall = pd.DataFrame(overall_rows)
+            if not df_overall.empty:
+                df_overall = df_overall.set_index(["model"]).sort_index()
+            df_overall.to_csv(out_dir / "overall_metrics.csv", index=True)
+
+            df_details = pd.DataFrame(details_rows)
+            if not df_details.empty:
+                df_details = df_details.set_index(["model", "repo", "question"]).sort_index()
+            df_details.to_csv(out_dir / "per_question_details.csv", index=True)
 
         except Exception:
             pass
@@ -212,7 +267,7 @@ class RetrieverTest:
         retrieved_set = {str(x).strip() for x in (retrieved or []) if str(x).strip()}
         return len(golden_set & retrieved_set) / len(golden_set)
 
-    def _index_repo(self, repo: Repository):
+    def _index_repo(self, repo: Repository, dense_model_name: str):
         if not self._languages_ready:
             self.language_registry.auto_register()
             self._languages_ready = True
@@ -227,6 +282,12 @@ class RetrieverTest:
                 neo4j_ingestor=self.neo4j,
                 language_registry=self.language_registry,
                 emb_store=emb_store,
+                emb_config=RepositoryEmbeddingConfig(
+                    dense_model_name=dense_model_name,
+                    use_cuda=True,
+                    indexing_batch_size=32,
+                    max_source_code_characters=5120,
+                ),
             )
             indexer.index_codebase()
         finally:
