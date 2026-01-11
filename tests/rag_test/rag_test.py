@@ -200,19 +200,21 @@ You are an evaluator (LLM-as-a-judge). You will be given:
 - a golden (reference) answer,
 - a model answer.
 
-Output ONLY valid JSON that matches the schema exactly, with integer scores from 1 to 5.
+Output ONLY valid JSON with EXACTLY these keys (lowercase snake_case) and integer values 1..5:
+correctness, completeness, precision, refusal_appropriateness, actionability, clarity.
 
-Rubric (use exactly these definitions):
-- Correctness - 5: fully correct, 1: incorrect
-- Completeness - 5: covers the entire golden answer, 1: covers nothing from the golden answer
-- Precision - 5: strictly to the point, 1: goes off-topic
-- Refusal Appropriateness - 5: refuses only when it should, 1: refuses when an answer exists
-- Actionability - 5: can be applied immediately, 1: useless
-- Clarity - 5: very clear, 1: chaotic
+Rubric:
+- correctness - 5: fully correct, 1: incorrect
+- completeness - 5: covers the entire golden answer, 1: covers nothing from the golden answer
+- precision - 5: strictly to the point, 1: goes off-topic
+- refusal_appropriateness - 5: refuses only when it should, 1: refuses when an answer exists
+- actionability - 5: can be applied immediately, 1: useless
+- clarity - 5: very clear, 1: chaotic
 
 Notes:
-- Evaluate the model answer relative to the golden answer and the question.
-- If the model answer refuses, assess whether that refusal was appropriate.
+- Judge the model answer vs the golden answer and the question.
+- If the model answer refuses, judge whether the refusal was appropriate.
+- No extra keys. No text outside JSON.
 """.strip()
 
         llm = ChatMistralAI(
