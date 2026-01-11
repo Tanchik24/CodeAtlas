@@ -19,7 +19,7 @@ logger = get_logger()
 
 @dataclass(frozen=True)
 class RepositoryEmbeddingConfig:
-    dense_model_name: str = "jinaai/jina-embeddings-v2-base-code"
+    dense_model_name: str = "BAAI/bge-small-en-v1.5"
     sparse_model_name: str = ""
     use_cuda: bool = True
     indexing_batch_size: int = 4

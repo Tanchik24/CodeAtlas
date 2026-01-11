@@ -325,8 +325,8 @@ class CodeRepoToolAgent:
         neo4j_ingestor: Any,
         store: Any,
         embedder: Any,
-        mistral_model: str,
         top_k: int = 6,
+        mistral_model: str | None = None,
     ) -> None:
         self.project_root_directory = Path(project_root).resolve()
         self.neo4j_ingestor = neo4j_ingestor
@@ -336,9 +336,11 @@ class CodeRepoToolAgent:
         self._thread_index: int = 0
         self._thread_id: str = self._make_thread_id()
 
+        model_name = mistral_model or cfg_llm.mistral_model
+
         configuration = RepositoryAgentConfiguration(
             repository_root_directory=self.project_root_directory,
-            mistral_model_name=str(mistral_model),
+            mistral_model_name=str(model_name),
             semantic_top_k_default=int(top_k),
         )
 
