@@ -6,8 +6,8 @@ from pydantic import BaseModel, Field, PrivateAttr
 from tree_sitter import Language, Parser, Node
 from .LanguageQueries import LanguageQueries
 
-from app.graph_builder.node_utils import get_text
-from app.enums import Language as lang_name
+from src.app.graph_builder.node_utils import get_text
+from src.app.enums import Language as lang_name
 
 
 class LanguageGrammar(BaseModel):

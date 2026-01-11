@@ -7,7 +7,7 @@ from functools import lru_cache
 
 from qdrant_client import QdrantClient
 
-from app.Logger import get_logger
+from src.app.Logger import get_logger
 
 logger = get_logger()
 

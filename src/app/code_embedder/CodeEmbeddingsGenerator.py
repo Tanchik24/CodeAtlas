@@ -8,9 +8,9 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qm
 
-from app.Logger import get_logger
-from services import Neo4jConnection
-from services.CodeEmbeddingsStore import CodeEmbeddingsStore
+from src.app.Logger import get_logger
+from src.services import Neo4jConnection
+from src.services.CodeEmbeddingsStore import CodeEmbeddingsStore
 
 from tqdm import tqdm
 

@@ -2,17 +2,17 @@ from __future__ import annotations
 
 from typing import Optional
 
-from app.entities.Project import Project
-from services import Neo4jIngestor
+from src.app.entities.Project import Project
+from src.services import Neo4jIngestor
 
-from app.enums import NodeLabel
-from app.languages import LanguageRegistry
-from app.graph_builder.GraphBuilder import GraphBuilder
+from src.app.enums import NodeLabel
+from src.app.languages import LanguageRegistry
+from src.app.graph_builder.GraphBuilder import GraphBuilder
 
-from services.CodeEmbeddingsStore import CodeEmbeddingsStore
-from app.code_embedder.CodeEmbeddingsGenerator import CodeEmbeddingsGenerator, RepositoryEmbeddingConfig
+from src.services.CodeEmbeddingsStore import CodeEmbeddingsStore
+from src.app.code_embedder.CodeEmbeddingsGenerator import CodeEmbeddingsGenerator, RepositoryEmbeddingConfig
 
-from app.Logger import get_logger
+from src.app.Logger import get_logger
 
 logger = get_logger()
 

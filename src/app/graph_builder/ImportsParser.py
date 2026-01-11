@@ -5,12 +5,12 @@ from typing import Optional, Set
 
 from tree_sitter import Node
 
-from app.languages import LanguageRegistry, LanguageGrammar
-from app.enums import Language as LanguageEnum
-from app.graph_builder.node_utils import iter_import_nodes, get_text
-from app.Logger import get_logger
-from services import Neo4jIngestor
-from app.enums import NodeLabel, RelType
+from src.app.languages import LanguageRegistry, LanguageGrammar
+from src.app.enums import Language as LanguageEnum
+from src.app.graph_builder.node_utils import iter_import_nodes, get_text
+from src.app.Logger import get_logger
+from src.services import Neo4jIngestor
+from src.app.enums import NodeLabel, RelType
 from . import CodeInfoRegestry
 
 logger = get_logger()

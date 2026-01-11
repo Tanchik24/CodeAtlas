@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Dict
 from pathlib import Path
 
-from app.enums import NodeLabel
+from src.app.enums import NodeLabel
 
 
 class CodeInfoRegestry:

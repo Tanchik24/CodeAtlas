@@ -4,12 +4,12 @@ from pathlib import Path
 from typing import Optional, List
 from tree_sitter import Node, Query
 
-from app.languages import LanguageRegistry, LanguageGrammar
-from app.entities.Project import Project
-from services import Neo4jIngestor
-from app.enums import NodeLabel, RelType, Language as lang_name
-from app.graph_builder.node_utils import get_text, get_docstring, extract_decorators, resolve_node_full_name
-from app.Logger import get_logger
+from src.app.languages import LanguageRegistry, LanguageGrammar
+from src.app.entities.Project import Project
+from src.services import Neo4jIngestor
+from src.app.enums import NodeLabel, RelType, Language as lang_name
+from src.app.graph_builder.node_utils import get_text, get_docstring, extract_decorators, resolve_node_full_name
+from src.app.Logger import get_logger
 from . import CodeInfoRegestry
 
 logger = get_logger()

@@ -2,7 +2,7 @@ from typing import Optional, Iterable
 from tree_sitter import Node
 import ast
 
-from app.Logger import get_logger
+from src.app.Logger import get_logger
 
 logger = get_logger()
 

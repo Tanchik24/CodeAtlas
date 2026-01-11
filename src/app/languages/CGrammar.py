@@ -5,7 +5,7 @@ from tree_sitter_languages import get_language
 
 from .LanguageGrammar import LanguageGrammar
 from .CPPQueries import CPPQueries
-from app.enums import Language as lang_name
+from src.app.enums import Language as lang_name
 
 class CGrammar(LanguageGrammar):
     file_exts: List[str] = [

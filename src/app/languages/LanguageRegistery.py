@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Dict, Optional, Type
 
 from .LanguageGrammar import LanguageGrammar
-from app.Logger import get_logger
+from src.app.Logger import get_logger
 
 
 logger = get_logger()

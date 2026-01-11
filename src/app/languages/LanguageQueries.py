@@ -1,5 +1,5 @@
 from __future__ import annotations
-from app.languages import LanguageGrammar
+from src.app.languages import LanguageGrammar
 
 
 class LanguageQueries:

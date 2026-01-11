@@ -5,8 +5,8 @@ from typing import Any
 
 from neo4j import GraphDatabase, Driver
 
-from app.config import get_config
-from app.Logger import get_logger
+from src.app.config import get_config
+from src.app.Logger import get_logger
 
 logger = get_logger()
 

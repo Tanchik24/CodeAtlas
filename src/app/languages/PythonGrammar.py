@@ -4,7 +4,7 @@ from tree_sitter import Language
 from tree_sitter_languages import get_language
 
 from .LanguageGrammar import LanguageGrammar
-from app.enums import Language as lang_name
+from src.app.enums import Language as lang_name
 
 
 class PythonGrammar(LanguageGrammar):

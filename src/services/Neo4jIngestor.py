@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.Logger import get_logger
-from services import Neo4jConnection
+from src.app.Logger import get_logger
+from src.services import Neo4jConnection
 
 logger = get_logger()
 
