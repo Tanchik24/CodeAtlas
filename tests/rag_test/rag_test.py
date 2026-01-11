@@ -194,33 +194,28 @@ class RagTester:
             actionability: Score
             clarity: Score
 
-        system_prompt = """
-You are an evaluator (LLM-as-a-judge). You will be given:
-- a user question,
-- a golden (reference) answer,
-- a model answer.
-
-Output ONLY valid JSON with EXACTLY these keys (lowercase snake_case) and integer values 1..5:
-correctness, completeness, precision, refusal_appropriateness, actionability, clarity.
-
-Rubric:
-- correctness - 5: fully correct, 1: incorrect
-- completeness - 5: covers the entire golden answer, 1: covers nothing from the golden answer
-- precision - 5: strictly to the point, 1: goes off-topic
-- refusal_appropriateness - 5: refuses only when it should, 1: refuses when an answer exists
-- actionability - 5: can be applied immediately, 1: useless
-- clarity - 5: very clear, 1: chaotic
-
-Notes:
-- Judge the model answer vs the golden answer and the question.
-- If the model answer refuses, judge whether the refusal was appropriate.
-- No extra keys. No text outside JSON.
-""".strip()
+        system_prompt = (
+        "You are an evaluator (LLM-as-a-judge). "
+        "Return ONLY valid JSON with EXACT keys: "
+        "correctness, completeness, precision, refusal_appropriateness, actionability, clarity. "
+        "Each value must be an integer 1..5.\n"
+        "Rubric:\n"
+        "- correctness - 5: fully correct, 1: incorrect\n"
+        "- completeness - 5: covers the entire golden answer, 1: covers nothing from the golden answer\n"
+        "- precision - 5: strictly to the point, 1: goes off-topic\n"
+        "- refusal_appropriateness - 5: refuses only when it should, 1: refuses when an answer exists\n"
+        "- actionability - 5: can be applied immediately, 1: useless\n"
+        "- clarity - 5: very clear, 1: chaotic\n"
+        "No extra keys. No text outside JSON.\n"
+        'Output format example: {"correctness":1,"completeness":1,"precision":1,'
+        '"refusal_appropriateness":1,"actionability":1,"clarity":1}'
+    )
 
         llm = ChatMistralAI(
             model=self.config.llm.mistral_model,
             temperature=self.config.llm.temperature,
             api_key=self.config.llm.mistral_api_key,
+            max_tokens=80,
         )
 
         judge = llm.with_structured_output(JudgeResult, method="json_mode")
