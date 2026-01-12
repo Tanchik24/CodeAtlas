@@ -10,7 +10,6 @@ env/
 ENV/
 
 .env
-.env.*
 .envrc
 
 .idea/
