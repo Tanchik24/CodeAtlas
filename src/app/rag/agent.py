@@ -17,6 +17,7 @@ from src.app.config import get_config
 
 cfg_llm = get_config().llm
 
+
 SYSTEM_PROMPT_EN = """
 You have a Neo4j code graph.
 
@@ -56,6 +57,10 @@ Policy / workflow:
   - you need relations (imports/defines/contains).
 - In the final answer, cite evidence as: `path: Lstart-Lend`.
 - If evidence is missing, say exactly what is missing (one short sentence). Do NOT ask questions.
+
+Anti-loop rule:
+- If ANY tool returns ok:false (or truncated error / tool output too large), DO NOT call any tool again.
+  Immediately produce the final answer with ONE short sentence describing exactly what evidence is missing.
 """.strip()
 
 
@@ -72,7 +77,7 @@ class RepositoryAgentConfiguration:
     max_cypher_rows: int = 50
 
     max_tool_output_characters: int = 12000
-    max_file_snippet_characters: int = 3000
+    max_file_snippet_characters: int = 9000
 
 
 def _to_jsonable(value: Any) -> Any:
@@ -94,8 +99,11 @@ def _dump_json(obj: Any) -> str:
     return json.dumps(obj, ensure_ascii=False)
 
 
-def _dump_obj_limited(obj: Any, limit: int) -> Dict[str, Any]:
+def _dump_json_limited(obj: Any, limit: int) -> str:
     limit = int(limit)
+
+    def dumps(x: Any) -> str:
+        return json.dumps(x, ensure_ascii=False)
 
     if not isinstance(obj, dict):
         obj = {"ok": False, "error": "tool output is not a dict", "value": str(obj)}
@@ -103,69 +111,79 @@ def _dump_obj_limited(obj: Any, limit: int) -> Dict[str, Any]:
     safe_any = _to_jsonable(obj)
     safe: Dict[str, Any] = safe_any if isinstance(safe_any, dict) else {"ok": False, "error": "tool output is not a dict"}
 
-    def _fits(x: Dict[str, Any]) -> bool:
+    def fits(x: Dict[str, Any]) -> bool:
         try:
-            return len(json.dumps(x, ensure_ascii=False)) <= limit
+            return len(dumps(x)) <= limit
         except Exception:
             return False
 
-    if _fits(safe):
-        return safe
+    if fits(safe):
+        return dumps(safe)
 
     out: Dict[str, Any] = dict(safe)
     out["truncated"] = True
     out.setdefault("error", "tool output too large")
 
-    if isinstance(out.get("text"), str):
-        t: str = out["text"]
-        keep = max(200, limit // 3)
-        out["text"] = t[:keep] + "\n# ... truncated ..."
-        if _fits(out):
-            return out
-        out["text"] = "[truncated]"
+    def trim_text_field(field: str, keep: int) -> None:
+        v = out.get(field)
+        if isinstance(v, str) and len(v) > keep:
+            out[field] = v[:keep] + "\n# ... truncated ..."
+
+    keep_text = max(500, limit // 3)
+    for tf in ("text", "docstring", "source", "content", "snippet"):
+        trim_text_field(tf, keep_text)
+        if fits(out):
+            return dumps(out)
+
+    for tf in ("text", "docstring", "source", "content", "snippet"):
+        if isinstance(out.get(tf), str):
+            out[tf] = "[truncated]"
+            if fits(out):
+                return dumps(out)
+
+    def slim_payload(p: Any) -> Any:
+        if not isinstance(p, dict):
+            return "[truncated]"
+        allow = ("path", "start_line", "end_line", "full_name", "name", "node_label")
+        return {k: p.get(k) for k in allow if k in p}
 
     for field in ("hits", "rows"):
         arr = out.get(field)
-        if not isinstance(arr, list):
+        if not isinstance(arr, list) or not arr:
             continue
 
-        slim: List[Any] = []
+        slim_list: List[Any] = []
         for item in arr:
             if isinstance(item, dict):
                 item2 = dict(item)
 
                 if "payload" in item2:
-                    p = item2.get("payload") or {}
-                    if isinstance(p, dict):
-                        item2["payload"] = {
-                            k: p.get(k)
-                            for k in ("path", "start_line", "end_line", "full_name", "name", "node_label")
-                            if k in p
-                        }
-                    else:
-                        item2["payload"] = "[truncated]"
+                    item2["payload"] = slim_payload(item2.get("payload"))
 
-                if "text" in item2 and isinstance(item2["text"], str):
-                    item2["text"] = "[truncated]"
+                for tf in ("text", "docstring", "source", "content", "snippet"):
+                    if isinstance(item2.get(tf), str):
+                        item2[tf] = "[truncated]"
 
-                candidate = slim + [item2]
+                candidate = slim_list + [item2]
             else:
-                candidate = slim + [item]
+                candidate = slim_list + [item]
 
-            if not _fits({**out, field: candidate}):
+            if not fits({**out, field: candidate}):
                 break
-            slim = candidate
 
-        out[field] = slim
+            slim_list = candidate
 
-        if _fits(out):
-            return out
+        out[field] = slim_list
+        if fits(out):
+            return dumps(out)
 
-    return {
-        "ok": bool(safe.get("ok", False)),
-        "error": out.get("error", "tool output too large"),
-        "truncated": True,
-    }
+    return dumps(
+        {
+            "ok": bool(safe.get("ok", False)),
+            "error": out.get("error", "tool output too large"),
+            "truncated": True,
+        }
+    )
 
 
 def _is_read_only_cypher(cypher_query: str) -> bool:
@@ -193,14 +211,14 @@ class GraphQueryReadOnlyToolBackend:
         self._max_cypher_rows = int(max_cypher_rows)
         self._max_tool_output_characters = int(max_tool_output_characters)
 
-    def graph_query_readonly(self, cypher_query: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def graph_query_readonly(self, cypher_query: str, params: Optional[Dict[str, Any]] = None) -> str:
         print("[TOOL] graph_query_readonly", cypher_query, params)
         query_text = (cypher_query or "").strip()
         if not query_text:
-            return _dump_obj_limited({"ok": False, "error": "Empty cypher_query"}, self._max_tool_output_characters)
+            return _dump_json_limited({"ok": False, "error": "Empty cypher_query"}, self._max_tool_output_characters)
 
         if not _is_read_only_cypher(query_text):
-            return _dump_obj_limited(
+            return _dump_json_limited(
                 {"ok": False, "error": "Forbidden Cypher: only read-only MATCH/RETURN queries are allowed."},
                 self._max_tool_output_characters,
             )
@@ -211,14 +229,14 @@ class GraphQueryReadOnlyToolBackend:
         try:
             records = self._neo4j_ingestor.fetch_all(query_text, params or {})
         except Exception as exc:
-            return _dump_obj_limited({"ok": False, "error": f"Neo4j error: {exc}"}, self._max_tool_output_characters)
+            return _dump_json_limited({"ok": False, "error": f"Neo4j error: {exc}"}, self._max_tool_output_characters)
 
         rows: List[dict] = []
         for record in (records or [])[: self._max_cypher_rows]:
             record_dict = dict(record) if not isinstance(record, dict) else record
             rows.append(_to_jsonable(record_dict))
 
-        return _dump_obj_limited({"ok": True, "rows": rows}, self._max_tool_output_characters)
+        return _dump_json_limited({"ok": True, "rows": rows}, self._max_tool_output_characters)
 
 
 class SemanticSearchToolBackend:
@@ -227,11 +245,11 @@ class SemanticSearchToolBackend:
         self._semantic_top_k_default = int(semantic_top_k_default)
         self._max_tool_output_characters = int(max_tool_output_characters)
 
-    def semantic_search(self, question_text: str, top_k: int = 0) -> Dict[str, Any]:
+    def semantic_search(self, question_text: str, top_k: int = 0) -> str:
         print("[TOOL] semantic_search", question_text, top_k)
         query_text = (question_text or "").strip()
         if not query_text:
-            return _dump_obj_limited({"ok": False, "error": "empty question_text", "hits": []}, self._max_tool_output_characters)
+            return _dump_json_limited({"ok": False, "error": "empty question_text", "hits": []}, self._max_tool_output_characters)
 
         effective_top_k = int(top_k) if int(top_k) > 0 else self._semantic_top_k_default
 
@@ -240,7 +258,7 @@ class SemanticSearchToolBackend:
         except TypeError:
             hits = self._embedder.search_question(query_text, effective_top_k)
         except Exception as exc:
-            return _dump_obj_limited(
+            return _dump_json_limited(
                 {"ok": False, "error": f"semantic_search error: {exc}", "hits": []},
                 self._max_tool_output_characters,
             )
@@ -253,7 +271,7 @@ class SemanticSearchToolBackend:
                 {"node_id": int(node_id), "score": float(score), "payload": _to_jsonable(payload or {})}
             )
 
-        return _dump_obj_limited({"ok": True, "hits": output_hits[:effective_top_k]}, self._max_tool_output_characters)
+        return _dump_json_limited({"ok": True, "hits": output_hits[:effective_top_k]}, self._max_tool_output_characters)
 
 
 class FileSpanReaderToolBackend:
@@ -263,27 +281,27 @@ class FileSpanReaderToolBackend:
         self._max_tool_output_characters = int(max_tool_output_characters)
         self._max_file_snippet_characters = int(max_file_snippet_characters)
 
-    def read_file_span(self, relative_path: str, start_line: int, end_line: int) -> Dict[str, Any]:
+    def read_file_span(self, relative_path: str, start_line: int, end_line: int) -> str:
         print("[TOOL] read_file_span", relative_path, start_line, end_line)
         rel = str(relative_path or "").strip()
         if not rel:
-            return _dump_obj_limited({"ok": False, "error": "empty relative_path"}, self._max_tool_output_characters)
+            return _dump_json_limited({"ok": False, "error": "empty relative_path"}, self._max_tool_output_characters)
 
         try:
             s = int(start_line)
             e = int(end_line)
         except Exception:
-            return _dump_obj_limited({"ok": False, "error": "start_line/end_line must be integers"}, self._max_tool_output_characters)
+            return _dump_json_limited({"ok": False, "error": "start_line/end_line must be integers"}, self._max_tool_output_characters)
 
         if s <= 0 or e <= 0 or e < s:
-            return _dump_obj_limited({"ok": False, "error": "invalid line range"}, self._max_tool_output_characters)
+            return _dump_json_limited({"ok": False, "error": "invalid line range"}, self._max_tool_output_characters)
 
         try:
             full_path = _enforce_repository_root(self._repository_root_directory, rel)
             if not full_path.is_file():
-                return _dump_obj_limited({"ok": False, "error": f"file not found: {rel}"}, self._max_tool_output_characters)
+                return _dump_json_limited({"ok": False, "error": f"file not found: {rel}"}, self._max_tool_output_characters)
         except Exception as exc:
-            return _dump_obj_limited({"ok": False, "error": f"path error: {exc}"}, self._max_tool_output_characters)
+            return _dump_json_limited({"ok": False, "error": f"path error: {exc}"}, self._max_tool_output_characters)
 
         lines: List[str] = []
         try:
@@ -295,7 +313,7 @@ class FileSpanReaderToolBackend:
                         break
                     lines.append(text)
         except Exception as exc:
-            return _dump_obj_limited({"ok": False, "error": f"file read error: {exc}"}, self._max_tool_output_characters)
+            return _dump_json_limited({"ok": False, "error": f"file read error: {exc}"}, self._max_tool_output_characters)
 
         snippet = "".join(lines)
         truncated = False
@@ -311,7 +329,7 @@ class FileSpanReaderToolBackend:
             "truncated": truncated,
             "text": snippet,
         }
-        return _dump_obj_limited(payload, self._max_tool_output_characters)
+        return _dump_json_limited(payload, self._max_tool_output_characters)
 
 
 class CodeRepositoryLangGraphAgent:
