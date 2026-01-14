@@ -8,6 +8,7 @@ from src.services import Neo4jIngestor
 from src.app.enums import NodeLabel
 from src.app.languages import LanguageRegistry
 from src.app.graph_builder.GraphBuilder import GraphBuilder
+from src.app.graph_builder.ImportsParser import ImportsParser
 
 from src.services.CodeEmbeddingsStore import CodeEmbeddingsStore
 from src.app.code_embedder.CodeEmbeddingsGenerator import CodeEmbeddingsGenerator, RepositoryEmbeddingConfig
@@ -24,20 +25,15 @@ class CodebaseIndexer:
         neo4j_ingestor: Neo4jIngestor,
         language_registry: LanguageRegistry,
         emb_store: CodeEmbeddingsStore,
-        emb_config: RepositoryEmbeddingConfig | None = None
     ) -> None:
         self.project: Project = project
         self.neo4j_ingestor: Neo4jIngestor = neo4j_ingestor
         self.language_registry: LanguageRegistry = language_registry
         self.emb_store: CodeEmbeddingsStore = emb_store
-        self.emb_config = emb_config or RepositoryEmbeddingConfig(
-                    use_cuda=True,
-                    indexing_batch_size=32,
-                    max_source_code_characters=5120,
-                )
 
         self.embedder: Optional[CodeEmbeddingsGenerator] = None
         self.graph_builder: GraphBuilder | None = None
+        self.import_parser: ImportsParser | None = None
 
         self.ignore_folders_and_files = {
             ".git",
@@ -73,6 +69,20 @@ class CodebaseIndexer:
 
         logger.info(f"Scanned files={files}, code_files={code_files}")
 
+        self.import_parser = ImportsParser(
+            self.project.name,
+            self.project.path,
+            self.language_registry,
+            self.neo4j_ingestor,
+            self.graph_builder.code_info_registry,
+        )
+
+        for path in self.project.path.rglob("*"):
+            if any(part in self.ignore_folders_and_files for part in path.parts):
+                continue
+            if path.is_file() and self.language_registry.get_by_extension(path.suffix):
+                self.import_parser.parse_imports(path)
+
         self.neo4j_ingestor.flush_all()
 
         try:
@@ -86,7 +96,11 @@ class CodebaseIndexer:
                 embeddings_store=self.emb_store,
                 neo4j_connection=self.neo4j_ingestor._conn,
                 project_name=self.project.name,
-                config=self.emb_config,
+                config=RepositoryEmbeddingConfig(
+                    use_cuda=True,
+                    indexing_batch_size=32,
+                    max_source_code_characters=5120,
+                ),
             )
 
             stats = self.embedder.generate_all()

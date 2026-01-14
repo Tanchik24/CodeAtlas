@@ -94,11 +94,33 @@ def _dump_json(obj: Any) -> str:
     return json.dumps(obj, ensure_ascii=False)
 
 
-def _dump_json_limited(obj: Any, limit: int) -> str:
-    text = _dump_json(obj)
-    if len(text) <= int(limit):
-        return text
-    return _dump_json({"ok": False, "error": "tool output too large", "truncated": True})
+def _dump_obj_limited(obj: Dict[str, Any], limit: int) -> Dict[str, Any]:
+    limit = int(limit)
+    if not isinstance(obj, dict):
+        return {"ok": False, "error": "tool output is not a dict", "truncated": True}
+
+    out = dict(obj)
+
+    text = out.get("text")
+    if isinstance(text, str) and len(text) > limit:
+        out["text"] = text[:limit] + "\n# ... truncated ..."
+        out["truncated"] = True
+        return out
+
+    def _truncate_list_field(field: str) -> None:
+        val = out.get(field)
+        if not isinstance(val, list):
+            return
+        max_n = max(1, limit // 500)
+        if len(val) > max_n:
+            out[field] = val[:max_n]
+            out["truncated"] = True
+            out.setdefault("error", "tool output too large")
+
+    _truncate_list_field("hits")
+    _truncate_list_field("rows")
+
+    return out
 
 
 def _is_read_only_cypher(cypher_query: str) -> bool:
@@ -126,14 +148,14 @@ class GraphQueryReadOnlyToolBackend:
         self._max_cypher_rows = int(max_cypher_rows)
         self._max_tool_output_characters = int(max_tool_output_characters)
 
-    def graph_query_readonly(self, cypher_query: str, params: Optional[Dict[str, Any]] = None) -> str:
+    def graph_query_readonly(self, cypher_query: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         print("[TOOL] graph_query_readonly", cypher_query, params)
         query_text = (cypher_query or "").strip()
         if not query_text:
-            return _dump_json_limited({"ok": False, "error": "Empty cypher_query"}, self._max_tool_output_characters)
+            return _dump_obj_limited({"ok": False, "error": "Empty cypher_query"}, self._max_tool_output_characters)
 
         if not _is_read_only_cypher(query_text):
-            return _dump_json_limited(
+            return _dump_obj_limited(
                 {"ok": False, "error": "Forbidden Cypher: only read-only MATCH/RETURN queries are allowed."},
                 self._max_tool_output_characters,
             )
@@ -144,14 +166,14 @@ class GraphQueryReadOnlyToolBackend:
         try:
             records = self._neo4j_ingestor.fetch_all(query_text, params or {})
         except Exception as exc:
-            return _dump_json_limited({"ok": False, "error": f"Neo4j error: {exc}"}, self._max_tool_output_characters)
+            return _dump_obj_limited({"ok": False, "error": f"Neo4j error: {exc}"}, self._max_tool_output_characters)
 
         rows: List[dict] = []
         for record in (records or [])[: self._max_cypher_rows]:
             record_dict = dict(record) if not isinstance(record, dict) else record
             rows.append(_to_jsonable(record_dict))
 
-        return _dump_json_limited({"ok": True, "rows": rows}, self._max_tool_output_characters)
+        return _dump_obj_limited({"ok": True, "rows": rows}, self._max_tool_output_characters)
 
 
 class SemanticSearchToolBackend:
@@ -160,11 +182,11 @@ class SemanticSearchToolBackend:
         self._semantic_top_k_default = int(semantic_top_k_default)
         self._max_tool_output_characters = int(max_tool_output_characters)
 
-    def semantic_search(self, question_text: str, top_k: int = 0) -> str:
+    def semantic_search(self, question_text: str, top_k: int = 0) -> Dict[str, Any]:
         print("[TOOL] semantic_search", question_text, top_k)
         query_text = (question_text or "").strip()
         if not query_text:
-            return _dump_json_limited({"ok": False, "error": "empty question_text", "hits": []}, self._max_tool_output_characters)
+            return _dump_obj_limited({"ok": False, "error": "empty question_text", "hits": []}, self._max_tool_output_characters)
 
         effective_top_k = int(top_k) if int(top_k) > 0 else self._semantic_top_k_default
 
@@ -173,7 +195,7 @@ class SemanticSearchToolBackend:
         except TypeError:
             hits = self._embedder.search_question(query_text, effective_top_k)
         except Exception as exc:
-            return _dump_json_limited(
+            return _dump_obj_limited(
                 {"ok": False, "error": f"semantic_search error: {exc}", "hits": []},
                 self._max_tool_output_characters,
             )
@@ -186,7 +208,7 @@ class SemanticSearchToolBackend:
                 {"node_id": int(node_id), "score": float(score), "payload": _to_jsonable(payload or {})}
             )
 
-        return _dump_json_limited({"ok": True, "hits": output_hits[:effective_top_k]}, self._max_tool_output_characters)
+        return _dump_obj_limited({"ok": True, "hits": output_hits[:effective_top_k]}, self._max_tool_output_characters)
 
 
 class FileSpanReaderToolBackend:
@@ -196,27 +218,27 @@ class FileSpanReaderToolBackend:
         self._max_tool_output_characters = int(max_tool_output_characters)
         self._max_file_snippet_characters = int(max_file_snippet_characters)
 
-    def read_file_span(self, relative_path: str, start_line: int, end_line: int) -> str:
+    def read_file_span(self, relative_path: str, start_line: int, end_line: int) -> Dict[str, Any]:
         print("[TOOL] read_file_span", relative_path, start_line, end_line)
         rel = str(relative_path or "").strip()
         if not rel:
-            return _dump_json_limited({"ok": False, "error": "empty relative_path"}, self._max_tool_output_characters)
+            return _dump_obj_limited({"ok": False, "error": "empty relative_path"}, self._max_tool_output_characters)
 
         try:
             s = int(start_line)
             e = int(end_line)
         except Exception:
-            return _dump_json_limited({"ok": False, "error": "start_line/end_line must be integers"}, self._max_tool_output_characters)
+            return _dump_obj_limited({"ok": False, "error": "start_line/end_line must be integers"}, self._max_tool_output_characters)
 
         if s <= 0 or e <= 0 or e < s:
-            return _dump_json_limited({"ok": False, "error": "invalid line range"}, self._max_tool_output_characters)
+            return _dump_obj_limited({"ok": False, "error": "invalid line range"}, self._max_tool_output_characters)
 
         try:
             full_path = _enforce_repository_root(self._repository_root_directory, rel)
             if not full_path.is_file():
-                return _dump_json_limited({"ok": False, "error": f"file not found: {rel}"}, self._max_tool_output_characters)
+                return _dump_obj_limited({"ok": False, "error": f"file not found: {rel}"}, self._max_tool_output_characters)
         except Exception as exc:
-            return _dump_json_limited({"ok": False, "error": f"path error: {exc}"}, self._max_tool_output_characters)
+            return _dump_obj_limited({"ok": False, "error": f"path error: {exc}"}, self._max_tool_output_characters)
 
         lines: List[str] = []
         try:
@@ -228,7 +250,7 @@ class FileSpanReaderToolBackend:
                         break
                     lines.append(text)
         except Exception as exc:
-            return _dump_json_limited({"ok": False, "error": f"file read error: {exc}"}, self._max_tool_output_characters)
+            return _dump_obj_limited({"ok": False, "error": f"file read error: {exc}"}, self._max_tool_output_characters)
 
         snippet = "".join(lines)
         truncated = False
@@ -244,7 +266,7 @@ class FileSpanReaderToolBackend:
             "truncated": truncated,
             "text": snippet,
         }
-        return _dump_json_limited(payload, self._max_tool_output_characters)
+        return _dump_obj_limited(payload, self._max_tool_output_characters)
 
 
 class CodeRepositoryLangGraphAgent:
@@ -276,7 +298,7 @@ class CodeRepositoryLangGraphAgent:
             StructuredTool.from_function(
                 func=graph_backend.graph_query_readonly,
                 name="graph_query_readonly",
-                description="Read-only Cypher query (MATCH/RETURN). Returns JSON rows.",
+                description="Read-only Cypher query (MATCH/RETURN)",
             ),
             StructuredTool.from_function(
                 func=semantic_backend.semantic_search,
@@ -286,7 +308,7 @@ class CodeRepositoryLangGraphAgent:
             StructuredTool.from_function(
                 func=file_backend.read_file_span,
                 name="read_file_span",
-                description="Read repository file by line range (1-based, inclusive). Returns JSON with exact text.",
+                description="Read repository file by line range (1-based, inclusive)",
             ),
         ]
 
@@ -296,7 +318,7 @@ class CodeRepositoryLangGraphAgent:
             model=str(configuration.model_name),
             temperature=float(configuration.temperature))
         
-        chat_model = chat_model.bind_tools(tools, tool_choice="required")
+        chat_model = chat_model.bind_tools(tools, tool_choice="auto")
 
         checkpointer = InMemoryCheckpointer()
 
