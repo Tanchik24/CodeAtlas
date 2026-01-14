@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from langchain_core.tools import StructuredTool
 from langgraph.prebuilt import create_react_agent
-from langchain_mistralai import ChatMistralAI
+from langchain_openai import ChatOpenAI
 
 try:
     from langgraph.checkpoint.memory import InMemorySaver as InMemoryCheckpointer
@@ -62,8 +62,10 @@ Policy / workflow:
 @dataclass(frozen=True)
 class RepositoryAgentConfiguration:
     repository_root_directory: Path
-    mistral_model_name: str = cfg_llm.mistral_model
+    model_name: str = cfg_llm.qwen_model_name
     temperature: float = cfg_llm.temperature
+    vllm_base_url: str = cfg_llm.vllm_base_url
+    vllm_api_key: str = cfg_llm.vllm_api_key
 
     recursion_limit: int = 18
     semantic_top_k_default: int = 8
@@ -283,13 +285,14 @@ class CodeRepositoryLangGraphAgent:
             ),
         ]
 
-        
-
-        chat_model = ChatMistralAI(
-            model=str(configuration.mistral_model_name),
+        chat_model = ChatOpenAI(
+            base_url=str(configuration.vllm_base_url),
+            api_key=str(configuration.vllm_api_key),
+            model=str(configuration.model_name),
             temperature=float(configuration.temperature),
-            api_key=cfg_llm.mistral_api_key
-        )
+            extra_body={"tool_choice": "auto"})
+        
+        chat_model = chat_model.bind_tools(tools, tool_choice="auto")
 
         checkpointer = InMemoryCheckpointer()
 
@@ -326,7 +329,7 @@ class CodeRepoToolAgent:
         store: Any,
         embedder: Any,
         top_k: int = 6,
-        mistral_model: str | None = None,
+        qwen_model: str | None = None,
     ) -> None:
         self.project_root_directory = Path(project_root).resolve()
         self.neo4j_ingestor = neo4j_ingestor
@@ -336,11 +339,11 @@ class CodeRepoToolAgent:
         self._thread_index: int = 0
         self._thread_id: str = self._make_thread_id()
 
-        model_name = mistral_model or cfg_llm.mistral_model
+        model_name = qwen_model or cfg_llm.qwen_model_name
 
         configuration = RepositoryAgentConfiguration(
             repository_root_directory=self.project_root_directory,
-            mistral_model_name=str(model_name),
+            model_name=str(model_name),
             semantic_top_k_default=int(top_k),
         )
 
