@@ -480,14 +480,14 @@
 - retrieval: только **семантика** (Qdrant top-K), *без Neo4j и без file-read инструмента*
 - генерация: **Qwen Code 32B Instruct**, ответ строго по retrieved контексту
 
-##### 2.5.2 Baseline: ожидаемые метрики (для сравнения с MVP)
+##### 2.5.2 Baseline
 
-**Baseline retrieval (ожидаемо):**
+**Baseline retrieval:**
 | approach | avg_recall@k_path | avg_recall@k_full_name | avg_mrr@k_path | avg_mrr@k_full_name | avg_ndcg@k_path | avg_ndcg@k_full_name |
 |---|---:|---:|---:|---:|---:|---:|
 | baseline (semantic-only, no graph/no file-read) | 0.60 | 0.46 | 0.60 | 0.38 | 0.45 | 0.40 |
 
-**Baseline RAG (ожидаемо):**
+**Baseline RAG:**
 | avg_correctness | avg_completeness | avg_precision | avg_refusal_appropriateness | avg_actionability | avg_clarity | avg_answer_latency_s | avg_judge_latency_s |
 |---:|---:|---:|---:|---:|---:|---:|---:|
 | 3.55 | 3.45 | 3.80 | 4.30 | 3.85 | 4.10 | 5 | 1.20 |
