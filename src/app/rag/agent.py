@@ -67,7 +67,7 @@ class RepositoryAgentConfiguration:
     vllm_base_url: str = cfg_llm.vllm_base_url
     vllm_api_key: str = cfg_llm.vllm_api_key
 
-    recursion_limit: int = 18
+    recursion_limit: int = 30
     semantic_top_k_default: int = 8
     max_cypher_rows: int = 50
 
@@ -127,6 +127,7 @@ class GraphQueryReadOnlyToolBackend:
         self._max_tool_output_characters = int(max_tool_output_characters)
 
     def graph_query_readonly(self, cypher_query: str, params: Optional[Dict[str, Any]] = None) -> str:
+        print("[TOOL] graph_query_readonly", cypher_query, params)
         query_text = (cypher_query or "").strip()
         if not query_text:
             return _dump_json_limited({"ok": False, "error": "Empty cypher_query"}, self._max_tool_output_characters)
@@ -160,6 +161,7 @@ class SemanticSearchToolBackend:
         self._max_tool_output_characters = int(max_tool_output_characters)
 
     def semantic_search(self, question_text: str, top_k: int = 0) -> str:
+        print("[TOOL] semantic_search", question_text, top_k)
         query_text = (question_text or "").strip()
         if not query_text:
             return _dump_json_limited({"ok": False, "error": "empty question_text", "hits": []}, self._max_tool_output_characters)
@@ -175,6 +177,8 @@ class SemanticSearchToolBackend:
                 {"ok": False, "error": f"semantic_search error: {exc}", "hits": []},
                 self._max_tool_output_characters,
             )
+        
+        print("[TOOL] semantic_search hits=", len(hits or []))
 
         output_hits: List[dict] = []
         for node_id, score, payload in hits or []:
@@ -193,6 +197,7 @@ class FileSpanReaderToolBackend:
         self._max_file_snippet_characters = int(max_file_snippet_characters)
 
     def read_file_span(self, relative_path: str, start_line: int, end_line: int) -> str:
+        print("[TOOL] read_file_span", relative_path, start_line, end_line)
         rel = str(relative_path or "").strip()
         if not rel:
             return _dump_json_limited({"ok": False, "error": "empty relative_path"}, self._max_tool_output_characters)
@@ -289,10 +294,9 @@ class CodeRepositoryLangGraphAgent:
             base_url=str(configuration.vllm_base_url),
             api_key=str(configuration.vllm_api_key),
             model=str(configuration.model_name),
-            temperature=float(configuration.temperature),
-            extra_body={"tool_choice": "auto"})
+            temperature=float(configuration.temperature))
         
-        chat_model = chat_model.bind_tools(tools, tool_choice="auto")
+        chat_model = chat_model.bind_tools(tools, tool_choice="required")
 
         checkpointer = InMemoryCheckpointer()
 
@@ -312,13 +316,14 @@ class CodeRepositoryLangGraphAgent:
             },
         )
 
+        for key in ("final", "output", "answer"):
+            val = result_state.get(key)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+
         messages = result_state.get("messages") or []
-        for message in reversed(messages):
-            if getattr(message, "type", "") in {"ai", "assistant"}:
-                content = getattr(message, "content", "")
-                if isinstance(content, str) and content.strip():
-                    return content.strip()
-        return ""
+        last_ai = next((message for message in reversed(messages) if getattr(message, "type", "") in {"ai", "assistant"}), None)
+        return (getattr(last_ai, "content", "") or "").strip()
 
 
 class CodeRepoToolAgent:
