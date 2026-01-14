@@ -332,7 +332,7 @@ class RagTester:
                 neo4j_ingestor=self.neo4j,
                 store=emb_store,
                 embedder=embedder,
-                mistral_model=self.config.llm.mistral_model,
+                qwen_model=self.config.llm.qwen_model_name,
                 top_k=8,
             )
 
