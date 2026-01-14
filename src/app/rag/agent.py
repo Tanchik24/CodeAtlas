@@ -72,7 +72,7 @@ class RepositoryAgentConfiguration:
     max_cypher_rows: int = 50
 
     max_tool_output_characters: int = 12000
-    max_file_snippet_characters: int = 9000
+    max_file_snippet_characters: int = 3000
 
 
 def _to_jsonable(value: Any) -> Any:
@@ -94,33 +94,78 @@ def _dump_json(obj: Any) -> str:
     return json.dumps(obj, ensure_ascii=False)
 
 
-def _dump_obj_limited(obj: Dict[str, Any], limit: int) -> Dict[str, Any]:
+def _dump_obj_limited(obj: Any, limit: int) -> Dict[str, Any]:
     limit = int(limit)
+
     if not isinstance(obj, dict):
-        return {"ok": False, "error": "tool output is not a dict", "truncated": True}
+        obj = {"ok": False, "error": "tool output is not a dict", "value": str(obj)}
 
-    out = dict(obj)
+    safe_any = _to_jsonable(obj)
+    safe: Dict[str, Any] = safe_any if isinstance(safe_any, dict) else {"ok": False, "error": "tool output is not a dict"}
 
-    text = out.get("text")
-    if isinstance(text, str) and len(text) > limit:
-        out["text"] = text[:limit] + "\n# ... truncated ..."
-        out["truncated"] = True
-        return out
+    def _fits(x: Dict[str, Any]) -> bool:
+        try:
+            return len(json.dumps(x, ensure_ascii=False)) <= limit
+        except Exception:
+            return False
 
-    def _truncate_list_field(field: str) -> None:
-        val = out.get(field)
-        if not isinstance(val, list):
-            return
-        max_n = max(1, limit // 500)
-        if len(val) > max_n:
-            out[field] = val[:max_n]
-            out["truncated"] = True
-            out.setdefault("error", "tool output too large")
+    if _fits(safe):
+        return safe
 
-    _truncate_list_field("hits")
-    _truncate_list_field("rows")
+    out: Dict[str, Any] = dict(safe)
+    out["truncated"] = True
+    out.setdefault("error", "tool output too large")
 
-    return out
+    if isinstance(out.get("text"), str):
+        t: str = out["text"]
+        keep = max(200, limit // 3)
+        out["text"] = t[:keep] + "\n# ... truncated ..."
+        if _fits(out):
+            return out
+        out["text"] = "[truncated]"
+
+    for field in ("hits", "rows"):
+        arr = out.get(field)
+        if not isinstance(arr, list):
+            continue
+
+        slim: List[Any] = []
+        for item in arr:
+            if isinstance(item, dict):
+                item2 = dict(item)
+
+                if "payload" in item2:
+                    p = item2.get("payload") or {}
+                    if isinstance(p, dict):
+                        item2["payload"] = {
+                            k: p.get(k)
+                            for k in ("path", "start_line", "end_line", "full_name", "name", "node_label")
+                            if k in p
+                        }
+                    else:
+                        item2["payload"] = "[truncated]"
+
+                if "text" in item2 and isinstance(item2["text"], str):
+                    item2["text"] = "[truncated]"
+
+                candidate = slim + [item2]
+            else:
+                candidate = slim + [item]
+
+            if not _fits({**out, field: candidate}):
+                break
+            slim = candidate
+
+        out[field] = slim
+
+        if _fits(out):
+            return out
+
+    return {
+        "ok": bool(safe.get("ok", False)),
+        "error": out.get("error", "tool output too large"),
+        "truncated": True,
+    }
 
 
 def _is_read_only_cypher(cypher_query: str) -> bool:

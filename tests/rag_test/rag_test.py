@@ -94,6 +94,8 @@ class RagTester:
                 if not q_text:
                     continue
 
+                agent.new_thread()
+
                 t0 = time.perf_counter()
                 model_answer = agent.ask(q_text)
                 answer_latencies.append(time.perf_counter() - t0)
