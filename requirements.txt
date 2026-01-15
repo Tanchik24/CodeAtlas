@@ -44,7 +44,6 @@ langchain-core>=1.2.6
 langchain-mistralai==1.1.1
 langgraph==1.0.5
 langgraph-checkpoint==3.0.1
-langgraph-prebuilt==1.0.5
 langgraph-sdk==0.3.0
 langsmith==0.4.59
 loguru==0.7.3

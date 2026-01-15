@@ -3,20 +3,16 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Callable
 
 from langchain_core.tools import StructuredTool
 from langgraph.prebuilt import create_react_agent
 from langchain_openai import ChatOpenAI
+from langgraph.checkpoint.memory import InMemorySaver as InMemoryCheckpointer
 
-try:
-    from langgraph.checkpoint.memory import InMemorySaver as InMemoryCheckpointer
-except Exception:
-    from langgraph.checkpoint.memory import MemorySaver as InMemoryCheckpointer  
 from src.app.config import get_config
 
 cfg_llm = get_config().llm
-
 
 SYSTEM_PROMPT_EN = """
 You have a Neo4j code graph.
@@ -95,11 +91,7 @@ def _to_jsonable(value: Any) -> Any:
     return str(value)
 
 
-def _dump_json(obj: Any) -> str:
-    return json.dumps(obj, ensure_ascii=False)
-
-
-def _dump_json_limited(obj: Any, limit: int) -> str:
+def _limit_payload(obj: Any, limit: int) -> Dict[str, Any]:
     limit = int(limit)
 
     def dumps(x: Any) -> str:
@@ -118,7 +110,7 @@ def _dump_json_limited(obj: Any, limit: int) -> str:
             return False
 
     if fits(safe):
-        return dumps(safe)
+        return safe
 
     out: Dict[str, Any] = dict(safe)
     out["truncated"] = True
@@ -133,18 +125,18 @@ def _dump_json_limited(obj: Any, limit: int) -> str:
     for tf in ("text", "docstring", "source", "content", "snippet"):
         trim_text_field(tf, keep_text)
         if fits(out):
-            return dumps(out)
+            return out
 
     for tf in ("text", "docstring", "source", "content", "snippet"):
         if isinstance(out.get(tf), str):
             out[tf] = "[truncated]"
             if fits(out):
-                return dumps(out)
+                return out
 
     def slim_payload(p: Any) -> Any:
         if not isinstance(p, dict):
             return "[truncated]"
-        allow = ("path", "start_line", "end_line", "full_name", "name", "node_label")
+        allow = ("path", "start_line", "end_line", "full_name", "name", "node_label", "qualified_name")
         return {k: p.get(k) for k in allow if k in p}
 
     for field in ("hits", "rows"):
@@ -156,35 +148,30 @@ def _dump_json_limited(obj: Any, limit: int) -> str:
         for item in arr:
             if isinstance(item, dict):
                 item2 = dict(item)
-
                 if "payload" in item2:
                     item2["payload"] = slim_payload(item2.get("payload"))
-
                 for tf in ("text", "docstring", "source", "content", "snippet"):
                     if isinstance(item2.get(tf), str):
                         item2[tf] = "[truncated]"
-
                 candidate = slim_list + [item2]
             else:
                 candidate = slim_list + [item]
 
             if not fits({**out, field: candidate}):
                 break
-
             slim_list = candidate
 
         out[field] = slim_list
         if fits(out):
-            return dumps(out)
+            return out
 
-    return dumps(
-        {
-            "ok": bool(safe.get("ok", False)),
-            "error": out.get("error", "tool output too large"),
-            "truncated": True,
-        }
-    )
+    return {"ok": bool(safe.get("ok", False)), "error": out.get("error", "tool output too large"), "truncated": True}
 
+
+def _tool_return(payload: Dict[str, Any], limit: int, want_artifact: bool = False) -> Any:
+    limited = _limit_payload(payload, limit)
+    content = json.dumps(limited, ensure_ascii=False)
+    return (content, limited) if want_artifact else content
 
 def _is_read_only_cypher(cypher_query: str) -> bool:
     normalized_upper = " ".join((cypher_query or "").strip().split()).upper()
@@ -211,16 +198,22 @@ class GraphQueryReadOnlyToolBackend:
         self._max_cypher_rows = int(max_cypher_rows)
         self._max_tool_output_characters = int(max_tool_output_characters)
 
-    def graph_query_readonly(self, cypher_query: str, params: Optional[Dict[str, Any]] = None) -> str:
+    def graph_query_readonly(
+        self,
+        cypher_query: str,
+        params: Optional[Dict[str, Any]] = None,
+        want_artifact: bool = False,
+    ) -> Any:
         print("[TOOL] graph_query_readonly", cypher_query, params)
         query_text = (cypher_query or "").strip()
         if not query_text:
-            return _dump_json_limited({"ok": False, "error": "Empty cypher_query"}, self._max_tool_output_characters)
+            return _tool_return({"ok": False, "error": "Empty cypher_query"}, self._max_tool_output_characters, want_artifact)
 
         if not _is_read_only_cypher(query_text):
-            return _dump_json_limited(
+            return _tool_return(
                 {"ok": False, "error": "Forbidden Cypher: only read-only MATCH/RETURN queries are allowed."},
                 self._max_tool_output_characters,
+                want_artifact,
             )
 
         if " LIMIT " not in (" " + query_text.upper() + " "):
@@ -229,14 +222,14 @@ class GraphQueryReadOnlyToolBackend:
         try:
             records = self._neo4j_ingestor.fetch_all(query_text, params or {})
         except Exception as exc:
-            return _dump_json_limited({"ok": False, "error": f"Neo4j error: {exc}"}, self._max_tool_output_characters)
+            return _tool_return({"ok": False, "error": f"Neo4j error: {exc}"}, self._max_tool_output_characters, want_artifact)
 
         rows: List[dict] = []
         for record in (records or [])[: self._max_cypher_rows]:
             record_dict = dict(record) if not isinstance(record, dict) else record
             rows.append(_to_jsonable(record_dict))
 
-        return _dump_json_limited({"ok": True, "rows": rows}, self._max_tool_output_characters)
+        return _tool_return({"ok": True, "rows": rows}, self._max_tool_output_characters, want_artifact)
 
 
 class SemanticSearchToolBackend:
@@ -245,24 +238,23 @@ class SemanticSearchToolBackend:
         self._semantic_top_k_default = int(semantic_top_k_default)
         self._max_tool_output_characters = int(max_tool_output_characters)
 
-    def semantic_search(self, question_text: str, top_k: int = 0) -> str:
+    def semantic_search(self, question_text: str, top_k: int = 0, want_artifact: bool = False) -> Any:
         print("[TOOL] semantic_search", question_text, top_k)
         query_text = (question_text or "").strip()
         if not query_text:
-            return _dump_json_limited({"ok": False, "error": "empty question_text", "hits": []}, self._max_tool_output_characters)
+            return _tool_return({"ok": False, "error": "empty question_text", "hits": []}, self._max_tool_output_characters, want_artifact)
 
         effective_top_k = int(top_k) if int(top_k) > 0 else self._semantic_top_k_default
 
         try:
             hits = self._embedder.search_question(question_text=query_text, top_k=effective_top_k)
-        except TypeError:
-            hits = self._embedder.search_question(query_text, effective_top_k)
         except Exception as exc:
-            return _dump_json_limited(
+            return _tool_return(
                 {"ok": False, "error": f"semantic_search error: {exc}", "hits": []},
                 self._max_tool_output_characters,
+                want_artifact,
             )
-        
+
         print("[TOOL] semantic_search hits=", len(hits or []))
 
         output_hits: List[dict] = []
@@ -271,37 +263,36 @@ class SemanticSearchToolBackend:
                 {"node_id": int(node_id), "score": float(score), "payload": _to_jsonable(payload or {})}
             )
 
-        return _dump_json_limited({"ok": True, "hits": output_hits[:effective_top_k]}, self._max_tool_output_characters)
+        return _tool_return({"ok": True, "hits": output_hits[:effective_top_k]}, self._max_tool_output_characters, want_artifact)
 
 
 class FileSpanReaderToolBackend:
-
     def __init__(self, repository_root_directory: Path, max_tool_output_characters: int, max_file_snippet_characters: int) -> None:
         self._repository_root_directory = repository_root_directory
         self._max_tool_output_characters = int(max_tool_output_characters)
         self._max_file_snippet_characters = int(max_file_snippet_characters)
 
-    def read_file_span(self, relative_path: str, start_line: int, end_line: int) -> str:
+    def read_file_span(self, relative_path: str, start_line: int, end_line: int, want_artifact: bool = False) -> Any:
         print("[TOOL] read_file_span", relative_path, start_line, end_line)
         rel = str(relative_path or "").strip()
         if not rel:
-            return _dump_json_limited({"ok": False, "error": "empty relative_path"}, self._max_tool_output_characters)
+            return _tool_return({"ok": False, "error": "empty relative_path"}, self._max_tool_output_characters, want_artifact)
 
         try:
             s = int(start_line)
             e = int(end_line)
         except Exception:
-            return _dump_json_limited({"ok": False, "error": "start_line/end_line must be integers"}, self._max_tool_output_characters)
+            return _tool_return({"ok": False, "error": "start_line/end_line must be integers"}, self._max_tool_output_characters, want_artifact)
 
         if s <= 0 or e <= 0 or e < s:
-            return _dump_json_limited({"ok": False, "error": "invalid line range"}, self._max_tool_output_characters)
+            return _tool_return({"ok": False, "error": "invalid line range"}, self._max_tool_output_characters, want_artifact)
 
         try:
             full_path = _enforce_repository_root(self._repository_root_directory, rel)
             if not full_path.is_file():
-                return _dump_json_limited({"ok": False, "error": f"file not found: {rel}"}, self._max_tool_output_characters)
+                return _tool_return({"ok": False, "error": f"file not found: {rel}"}, self._max_tool_output_characters, want_artifact)
         except Exception as exc:
-            return _dump_json_limited({"ok": False, "error": f"path error: {exc}"}, self._max_tool_output_characters)
+            return _tool_return({"ok": False, "error": f"path error: {exc}"}, self._max_tool_output_characters, want_artifact)
 
         lines: List[str] = []
         try:
@@ -313,7 +304,7 @@ class FileSpanReaderToolBackend:
                         break
                     lines.append(text)
         except Exception as exc:
-            return _dump_json_limited({"ok": False, "error": f"file read error: {exc}"}, self._max_tool_output_characters)
+            return _tool_return({"ok": False, "error": f"file read error: {exc}"}, self._max_tool_output_characters, want_artifact)
 
         snippet = "".join(lines)
         truncated = False
@@ -329,15 +320,14 @@ class FileSpanReaderToolBackend:
             "truncated": truncated,
             "text": snippet,
         }
-        return _dump_json_limited(payload, self._max_tool_output_characters)
+        return _tool_return(payload, self._max_tool_output_characters, want_artifact)
+
 
 
 class CodeRepositoryLangGraphAgent:
     def __init__(self, configuration: RepositoryAgentConfiguration, neo4j_ingestor: Any, embedder: Any) -> None:
         if create_react_agent is None:
-            raise RuntimeError(
-                "langgraph.prebuilt.create_react_agent is not available in your installed langgraph version."
-            )
+            raise RuntimeError("langgraph.prebuilt.create_react_agent is not available in your installed langgraph version.")
 
         self._configuration = configuration
 
@@ -357,21 +347,37 @@ class CodeRepositoryLangGraphAgent:
             max_file_snippet_characters=configuration.max_file_snippet_characters,
         )
 
+        want_artifact = False
+
+        def make_tool(func: Callable[..., Any], name: str, description: str) -> StructuredTool:
+            nonlocal want_artifact
+            try:
+                t = StructuredTool.from_function(
+                    func=func,
+                    name=name,
+                    description=description,
+                    response_format="content_and_artifact",
+                )
+                want_artifact = True
+                return t
+            except TypeError:
+                return StructuredTool.from_function(func=func, name=name, description=description)
+            
         tools: List[StructuredTool] = [
-            StructuredTool.from_function(
-                func=graph_backend.graph_query_readonly,
-                name="graph_query_readonly",
-                description="Read-only Cypher query (MATCH/RETURN)",
+            make_tool(
+                lambda cypher_query, params=None: graph_backend.graph_query_readonly(cypher_query, params, want_artifact),
+                "graph_query_readonly",
+                "Read-only Cypher query (MATCH/RETURN)",
             ),
-            StructuredTool.from_function(
-                func=semantic_backend.semantic_search,
-                name="semantic_search",
-                description="Semantic search over code entities. Returns node_id + payload.",
+            make_tool(
+                lambda question_text, top_k=0: semantic_backend.semantic_search(question_text, top_k, want_artifact),
+                "semantic_search",
+                "Semantic search over code entities. Returns node_id + payload.",
             ),
-            StructuredTool.from_function(
-                func=file_backend.read_file_span,
-                name="read_file_span",
-                description="Read repository file by line range (1-based, inclusive)",
+            make_tool(
+                lambda relative_path, start_line, end_line: file_backend.read_file_span(relative_path, start_line, end_line, want_artifact),
+                "read_file_span",
+                "Read repository file by line range (1-based, inclusive)",
             ),
         ]
 
@@ -379,18 +385,17 @@ class CodeRepositoryLangGraphAgent:
             base_url=str(configuration.vllm_base_url),
             api_key=str(configuration.vllm_api_key),
             model=str(configuration.model_name),
-            temperature=float(configuration.temperature))
-        
-        chat_model = chat_model.bind_tools(tools, tool_choice="auto")
+            temperature=float(configuration.temperature),
+        )
 
         checkpointer = InMemoryCheckpointer()
 
         self._compiled_graph = create_react_agent(
-            model=chat_model,
-            tools=tools,
-            prompt=SYSTEM_PROMPT_EN,
-            checkpointer=checkpointer,
-        )
+                model=chat_model,
+                tools=tools,
+                prompt=SYSTEM_PROMPT_EN,
+                checkpointer=checkpointer,
+            )
 
     def ask(self, question_text: str, thread_id: str) -> str:
         result_state = self._compiled_graph.invoke(
@@ -407,7 +412,10 @@ class CodeRepositoryLangGraphAgent:
                 return val.strip()
 
         messages = result_state.get("messages") or []
-        last_ai = next((message for message in reversed(messages) if getattr(message, "type", "") in {"ai", "assistant"}), None)
+        last_ai = next(
+            (message for message in reversed(messages) if getattr(message, "type", "") in {"ai", "assistant"}),
+            None,
+        )
         return (getattr(last_ai, "content", "") or "").strip()
 
 

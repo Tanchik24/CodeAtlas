@@ -22,6 +22,6 @@ class LLMConfig(BaseSettings):
         validation_alias=AliasChoices("LLM_MISTRAL_MODEL", "MISTRAL_MODEL"),
     )
     temperature: float = Field(0.0)
-    qwen_model_name: str = Field('Qwen/Qwen2.5-Coder-32B-Instruct-AWQ')
+    qwen_model_name: str = Field('cyankiwi/Qwen3-Coder-30B-A3B-Instruct-AWQ-4bit')
     vllm_base_url: str = Field('http://localhost:9000/v1')
     vllm_api_key: str = Field("EMPTY")
