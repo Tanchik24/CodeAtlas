@@ -254,7 +254,7 @@
 - Реализовать **семантический поиск по коду**: по текстовому запросу разработчика находить релевантные фрагменты кода (top-K сниппетов)
 - Реализовать **графовый поиск по коду**: извлекать связанные сущности и контекст через Neo4j/Cypher (DEFINES/CALLS/IMPORTS/INHERITS) и объединять с результатами семантического поиска
 - Реализовать **qa-слой на базе локальной LLM**: формировать понятный ответ на естественном языке с ссылками на конкретные файлы и строки
-- Обернуть решение в **продовый сервис** , пригодный для пилота внутри одной команды разработки
+- Обернуть решение в **продовый сервис**, пригодный для пилота внутри одной команды разработки
 
 ### 2.2. Блок-схема этапов разработки
 
@@ -322,7 +322,7 @@
 
 **Необходимый результат этапа**
 
-- Репо скачаны и зафиксированы по `commit_sha` 
+- Репо скачаны и зафиксированы 
 - Настроен whitelist/фильтры файлов
 - Построен граф знаний (узлы/рёбра) и сохранён в графовую бд
 - Сформированы чанки на уровне функций/методов/классов и рассчитаны эмбеддинги
@@ -365,7 +365,7 @@
 ## Выбранные модели
 
 **Локальная LLM (генерация ответа):**
-- **Qwen Code 32B Instruct** (локально, внутри периметра)
+- **cyankiwi/Qwen3-Coder-30B-A3B-Instruct-AWQ-4bit** (локально, внутри периметра)
 
 **Embedding-модели (retrieval):**
 - В рамках MVP протестированы 3 эмбеддера:
@@ -478,14 +478,14 @@
 ##### 2.5.1 Что считаем baseline
 **Baseline** - простой RAG без агента и без графа:
 - retrieval: только **семантика** (Qdrant top-K), *без Neo4j и без file-read инструмента*
-- генерация: **Qwen Code 32B Instruct**, ответ строго по retrieved контексту
+- генерация: **cyankiwi/Qwen3-Coder-30B-A3B-Instruct-AWQ-4bit**, ответ строго по retrieved контексту
 
 ##### 2.5.2 Baseline
 
 **Baseline retrieval:**
 | approach | avg_recall@k_path | avg_recall@k_full_name | avg_mrr@k_path | avg_mrr@k_full_name | avg_ndcg@k_path | avg_ndcg@k_full_name |
 |---|---:|---:|---:|---:|---:|---:|
-| baseline (semantic-only, no graph/no file-read) | 0.60 | 0.46 | 0.60 | 0.38 | 0.45 | 0.40 |
+| baseline  | 0.60 | 0.46 | 0.60 | 0.38 | 0.45 | 0.40 |
 
 **Baseline RAG:**
 | avg_correctness | avg_completeness | avg_precision | avg_refusal_appropriateness | avg_actionability | avg_clarity | avg_answer_latency_s | avg_judge_latency_s |
@@ -503,7 +503,7 @@
 - Neo4j/Cypher graph search
 - Qdrant semantic search
 - file-read по `path + lines`
-- генерация: **Qwen Code 32B Instruct** по собранному контексту, со ссылками `file:lines`
+- генерация: **cyankiwi/Qwen3-Coder-30B-A3B-Instruct-AWQ-4bit** по собранному контексту, со ссылками `file:lines`
 
 ##### 2.6.2 MVP: результаты retrieval (эксперимент по выбору эмбеддера)
 
@@ -668,8 +668,8 @@
 
 **Целевой сетап пилота**
 - GPU: **1* NVIDIA A100 80GB** (**308.13 р/час** или **207 064 р/мес** при постоянной аренде)
-- LLM: **Qwen Code 32B Instruct**, режим **INT4**  + инференс через **vLLM** (continuous batching)
-- Контекст: **8k tokens / запрос** (примерная оценка)
+- LLM: **cyankiwi/Qwen3-Coder-30B-A3B-Instruct-AWQ-4bit**, режим **INT4**  + инференс через **vLLM** (continuous batching)
+- Контекст: **16k tokens / запрос** (примерная оценка)
 - Retrieval: **Qdrant**, отдельная коллекция **на репозиторий**, эмбеддер для пилота **BAAI/bge-small-en-v1.5**
 
 ---
@@ -681,19 +681,20 @@
 
 ---
 
-#### 3.3.2. VRAM-бюджет для Qwen 32B на A100 80GB при INT4 и 8k контексте
+#### 3.3.2. VRAM-бюджет для Qwen 30B на A100 80GB при INT4 и 16k контексте
 **Память под веса (оценка):**
-- INT4: `32.5B params * 4 bits ~ 16.25 GB`  
+- INT4: `30B params * 4 bits ~ 15 GB`  
   + служебный оверхед -> **~18-20 GB**.
 
 **KV-кэш (оценка на 1 запрос, FP16 KV):**
-- bytes/token ~ `2(K,V) * n_layers(64) * n_kv_heads(8) * head_dim(128) * 2 bytes`
-- ~ **256 KB/token**
-- **8k tokens -> ~2 GB KV на запрос**
+- bytes/token ~ `2(K,V) * n_layers(48) * n_kv_heads(4) * head_dim(128) * 2 bytes`
+- ~ **96 KB/token**
+- **16k tokens -> ~1.5 GB KV на запрос**
 
 **Практический вывод для A100 80GB:**
-- остаётся порядка **~60 GB** под KV/активации/батчинг,
-- теоретически это **~25 параллельных** 8k-запросов,
+- VLLM при запуске занимает 80 * 0.82 = 65,6 GB
+- минус веса, остаётся порядка **~47 GB** под KV/активации/батчинг,
+- теоретически это **~30 параллельных** 16k-запросов, но при запске VLLM будем ограничевать --max-num-seqs 16. Для пилота этого достаточно для одновреенных запросов 
 
 ---
 
@@ -741,13 +742,211 @@
 
 #### 3.3.6. Фиксируем ограничения 
 Чтобы удерживать SLA **p50 5s / p95 <=10s** и не раздувать KV-кэш:
-- **token budget:** вход **~ 8k tokens**, выход (фиксируем в конфиге)
+- **token budget:** вход **~ 16k tokens**, выход (фиксируем в конфиге)
 - **semantic_search:** `top_k = 6-8`
 - **file-read:** <= **2-3 вызова** на запрос; лимит на размер сниппета (строки/символы)
 - **graph_query_readonly:** лимит строк `max_cypher_rows` + лимит числа вызовов
-- **одноврменно запросов:** целимся в **8-16** на A100 80GB (INT4, 8k), при превышении - очередь
+- **одноврменно запросов:** целимся в **16** на A100 80GB (INT4, 16k), при превышении очередь
 - **кэширование:** кэш retrieval/ответов для повторяющихся вопросов (онбординг даёт много повторов)
 
+_________
 
+## 4. Внедрение 
 
+### 4.1 Архитектура решения 
 
+![alt text](image-1.png)
+
+**Компоненты** 
+
+1) `Streamlit UI`
+
+- Простой чат-интерфейс: скачать репо -> перейти в чат -> задавать вопросы
+- Отправляет запросы в FastAPI по HTTP
+- Показывает историю и собирает оценку ответа 1-5
+
+2) `FastAPI API`
+
+- HTTP-слой над сервисом
+- Выдаёт/читает cookie uid
+- Маршрутизирует запросы в RepoQAService
+
+3) `RepoQAService`
+
+- Оркестратор 
+- Держит кеш агентов по (user_id, repo_id)
+- Управляет:
+   - workspace репозитория
+   - индексацией через CodebaseIndexer
+   - сбросом индекса (Neo4j + Qdrant)
+   - историей чата через SQLite
+
+4) SQLite (SQLAlchemy: `Models` + `Store`)
+
+- Таблица Repo: github_url, server_path, project_name, collection_name, is_indexed
+- Таблица User: id (cookie uid), repo_id, messages_history
+
+5) Индексация кода (`CodebaseIndexer`, `GraphBuilder`, `ImportsParser`, `Neo4jIngestor`)
+
+- `GraphBuilder` строит граф: packages/folders/modules/classes/functions/methods + связи 
+- `ImportsParser` добавляет связи IMPORTS 
+- `Neo4jIngestor` буферизует записи и пишет в Neo4j
+
+6) Векторное хранилище (Qdrant)
+
+- Локальный Qdrant
+- Коллекция на репозиторий: collection_name
+- Payload хранит path + start_line/end_line + full_name + module/class
+
+7) Генерация эмбеддингов (`CodeEmbeddingsGenerator`)
+
+- Читает сущности (Function/Class/Method) из Neo4j
+- Читает соответствующий код из workspace по path + lines
+- Пишет embeddings в Qdrant (fastembed)
+
+8) QA-слой (LangGraph ReAct агент)
+
+- LLM: через ChatOpenAI -> локальный vLLM сервер
+- Инструменты агента:
+   - semantic_search -> Qdrant
+   - graph_query_readonly -> Neo4j
+   - read_file_span -> workspace (вытаскивает точный кусок по строкам)
+
+**Основные потоки данных**
+
+1) Index repo (первичная индексация)
+- UI -> POST /repos/ensure 
+- FastAPI -> RepoQAService.ensure_repo()
+- git clone в workspace
+- CodebaseIndexer.index_codebase():
+   - GraphBuilder + ImportsParser -Ю Neo4j
+   - EmbeddingsGenerator -> Qdrant 
+- SQLite: Repo.is_indexed = true
+
+2) Chat / QA
+- UI -> POST /chat (repo_id, message)
+- FastAPI -> RepoQAService.ask()
+- SQLite: append user message
+- Agent:
+- semantic_search (Qdrant) / при необходимости graph_query_readonly (Neo4j)
+- read_file_span (workspace) для точного кода
+- генерация ответа через vLLM
+- SQLite: append assistant message
+- UI показывает ответ + пользователь ставит оценку
+
+**Методы API**
+
+- `GET /health`
+
+Назначение: проверка доступности API
+
+Ответ: `{ "ok": true }`
+
+- `POST /repos/ensure`
+
+Назначение: обеспечить репозиторий на сервере - clone + (если надо) index
+
+Body: `{ github_url: str }`
+
+Ответ: `RepoResponse {id, github_url, server_path, is_indexed, project_name, collection_name}`
+
+- `GET /repos/{repo_id}`
+
+Назначение: получить метаданные репозитория из SQLite
+
+Ответ: `RepoResponse`
+
+- POST `/repos/{repo_id}/reindex`
+
+Назначение: принудительный reset+reindex
+
+Ответ: `RepoResponse`
+
+- `POST /chat`
+
+Назначение: задать вопрос по репозиторию
+
+Body: `{ repo_id: int, message: str }`
+
+Ответ: `{ answer: str }`
+
+- `GET /chat/history?repo_id`
+
+Назначение: получить историю чата пользователя для репозитория
+
+Ответ: `{ user_id, repo_id, messages_history: [{role, content}, ...] }`
+
+- `POST /chat/clear/repo_id`
+
+Назначение: очистить историю чата пользователя для репозитория.
+
+Ответ: `{ user_id, repo_id, messages_history: [] }`
+
+______
+
+### 4.2 Инфраструктура и масштабируемость
+
+**Выбранная инфраструктура**
+
+A100 80GB для LLM
+
+Qdrant + Neo4j + FastAPI + Streamlit на CPU/VM внутри периметра.
+Разделение Qdrant-коллекций по репозиториям - меньше риск утечек контекста между проектами
+
+**Масштабирование**
+
+- FastAPI/Streamlit - горизонтально (несколько реплик)
+- Qdrant - масштабирование по shard/replica при росте репозиториев/нагрузки
+- Neo4j - вертикально на пилоте, дальше - кластер/реплики чтения при необходимости
+- LLM - либо ограничиваем параллельность + очередь, либо добавляем GPU/реплики vLLM
+
+**Плюсы выбора**
+
+- Быстрое внедрение
+- Локальность данных соблюдается
+- Qdrant+Neo4j закрывают разные типы вопросов
+
+**Минусы / альтернативы**
+
+- Один GPU = ограничение по параллельности/очереди
+- Граф/парсинг - источник техдолга и потенциальной нестабильности
+
+________
+
+### 4.3. Требования к работе системы
+
+- p50 latency: <= 5 сек, p95: <= 10 сек
+- Ограничения нагрузки 
+- Контекст: ~16k tokens на запрос 
+- semantic_search top_k = 5 
+- graph_query_readonly: лимит на число строк/вызовов
+- Параллельность LLM: фиксируем --max-num-seqs (и включаем очередь при превышении)
+
+________
+
+### 4.4. Безопасность системы
+
+- Попытки вытянуть лишний код через file-read
+- Инъекции в Cypher 
+
+**Меры**
+
+- graph_query_readonly - только read-only, whitelist шаблонов/лимиты строк
+- read_file_span - только внутри workspace repo и только по разрешённым путям, лимит размера
+- Rate limiting + очередь на LLM
+
+________
+
+### 4.6. Издержки 
+
+- A100 80GB: ~207 064 р/мес при постоянной аренде (или 308.13 р/час по факту)
+- CPU/Storage
+- Рост затрат будет идти от: числа репозиториев (диск + Qdrant), числа пользователей (LLM)
+
+________
+
+### 4.7. Integration points
+
+- Внутренний Git: clone
+- auth: выдача прав, сопоставление user (техдолг)
+- CI/Webhooks (техдолг): инкрементальная переиндексация на push/merge

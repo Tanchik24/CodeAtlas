@@ -1,0 +1,71 @@
+{
+  "url": "https://github.com/huggingface/pytorch-image-models",
+  "questions": [
+    { "query": "В каких классах timm реализованы attention-модули (механизм внимания)?" },
+    { "query": "Какие классы отвечают за self-attention в репозитории pytorch-image-models (timm)?" },
+    { "query": "Где в коде timm находится реализация слоя внимания — в каких классах она описана?" },
+
+    { "query": "Как создать CSPResNet50 с предобученными весами через timm?" },
+    { "query": "Какой минимальный пример кода, чтобы запустить cspresnet50 с pretrained=True?" },
+    { "query": "Как в timm инициализировать модель 'cspresnet50' с готовыми pretrained весами?" },
+
+    { "query": "В каком файле timm лежит реализация модели HRNet?" },
+    { "query": "Где в репозитории pytorch-image-models находится исходник HRNet (путь к файлу)?" },
+    { "query": "Подскажи, где искать код HRNet внутри timm/pytorch-image-models." },
+
+    { "query": "Как в этом репозитории экспортировать модель в ONNX? Есть ли готовая функция для этого?" },
+    { "query": "Каким способом в timm делается ONNX export (например через onnx_export)?" },
+    { "query": "Как сохранить модель из timm в файл .onnx с помощью утилит репозитория?" },
+
+    { "query": "Есть ли в timm собственные реализации функций потерь? Какие лоссы доступны?" },
+    { "query": "Поддерживает ли pytorch-image-models набор loss-функций (например AsymmetricLossMultiLabel)?" },
+    { "query": "Где в репозитории находятся реализации loss’ов и какие примеры классов там есть?" },
+
+    { "query": "Можно ли использовать timm (pytorch-image-models) вместе с LLamaFactory? Есть ли интеграция?" },
+    { "query": "Как подключить этот репозиторий к LLamaFactory — предусмотрен ли такой сценарий?" },
+    { "query": "Есть ли в timm функционал/интерфейсы для работы через LLamaFactory, или этого нет?" },
+
+    { "query": "Где в timm определена функция create_model, которая создаёт модель по строковому имени?" },
+    { "query": "В каком модуле/файле реализован create_model (принимает 'resnet50', 'vit_base' и т.п.)?" },
+    { "query": "Подскажи, где искать реализацию create_model, выбирающую нужную модель по имени." },
+
+    { "query": "Где реализована функция, которая парсит имя модели перед созданием (parse_model_name или аналог)?" },
+    { "query": "Какая функция в timm разбирает строковое model_name (source/tag) до создания модели и где она находится?" },
+    { "query": "В каком месте кода timm происходит парсинг имени модели до вызова create_model?" },
+
+    { "query": "Где определён register_model — механизм регистрации моделей в реестре timm?" },
+    { "query": "В каком файле находится register_model, чтобы create_model мог находить зарегистрированные модели?" },
+    { "query": "Где в коде реализована регистрация моделей (register_model) и как к ней привязан create_model?" },
+
+    { "query": "Где реализована функция list_models (или аналог), которая возвращает список доступных моделей?" },
+    { "query": "Какой модуль в timm отвечает за выдачу списка зарегистрированных моделей из реестра?" },
+    { "query": "В каком файле лежит list_models, который перечисляет имена моделей в registry?" },
+
+    { "query": "Где находится create_dataset — фабрика датасетов, собирающая Dataset по аргументам?" },
+    { "query": "Подскажи путь к функции create_dataset в timm/data, которая создаёт нужный Dataset." },
+    { "query": "В каком модуле реализован create_dataset (dataset_factory) в pytorch-image-models?" },
+
+    { "query": "Где реализована create_loader — фабрика DataLoader, применяющая batch-настройки и аугментации?" },
+    { "query": "В каком файле timm находится create_loader, который собирает DataLoader с augmentations?" },
+    { "query": "Где искать функцию create_loader для подготовки DataLoader в timm?" },
+
+    { "query": "Где реализована resolve_data_config, которая вычисляет input_size/mean/std/interpolation и т.п.?" },
+    { "query": "В каком модуле timm считается data_config через resolve_data_config (параметры входа и нормализации)?" },
+    { "query": "Где в коде находится логика формирования data_config (input_size, mean, std, interpolation)?" },
+
+    { "query": "Где в timm реализованы MixUp/CutMix: класс Mixup и функция mixup_target?" },
+    { "query": "В каком файле лежит реализация Mixup и генерации смешанных таргетов (mixup_target)?" },
+    { "query": "Где найти код MixUp/CutMix в pytorch-image-models (Mixup, mixup_target)?" },
+
+    { "query": "Где определены классы лоссов SoftTargetCrossEntropy и LabelSmoothingCrossEntropy в timm?" },
+    { "query": "В каком модуле реализованы loss-функции soft-target cross-entropy и label-smoothing cross-entropy?" },
+    { "query": "Подскажи файл, где объявлены SoftTargetCrossEntropy и LabelSmoothingCrossEntropy." },
+
+    { "query": "Где реализованы лоссы JsdCrossEntropy и AsymmetricLossMultiLabel в pytorch-image-models?" },
+    { "query": "В каких файлах находятся реализации JSD loss и AsymmetricLossMultiLabel?" },
+    { "query": "Где в timm искать исходники классов JsdCrossEntropy и AsymmetricLossMultiLabel?" },
+
+    { "query": "Какая функция в timm принимает строковое имя модели и возвращает инстанс (factory), и где она определена?" },
+    { "query": "Как называется и где реализован attention-блок в timm (включая rope-вариант), в каких классах он находится?" }
+  ]
+}
