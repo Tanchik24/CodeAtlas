@@ -7,19 +7,19 @@ import subprocess
 from pathlib import Path
 from typing import Dict, Tuple
 
-from db import SQLiteStoreSA
-from db import Repo, User
+from src.db import SQLiteStoreSA
+from src.db import Repo, User
 
-from services.Neo4jIngestor import Neo4jIngestor
-from app.languages import LanguageRegistry
-from app.entities.Project import Project
-from app.code_indexer import CodebaseIndexer
+from src.services.Neo4jIngestor import Neo4jIngestor
+from src.app.languages import LanguageRegistry
+from src.app.entities.Project import Project
+from src.app.code_indexer import CodebaseIndexer
 
-from app.rag.agent import CodeRepoToolAgent
-from services.CodeEmbeddingsStore import CodeEmbeddingsStore
-from app.code_embedder.CodeEmbeddingsGenerator import CodeEmbeddingsGenerator, RepositoryEmbeddingConfig
+from src.app.rag.agent import CodeRepoToolAgent
+from src.services.CodeEmbeddingsStore import CodeEmbeddingsStore
+from src.app.code_embedder.CodeEmbeddingsGenerator import CodeEmbeddingsGenerator, RepositoryEmbeddingConfig
 
-from app.config import get_config
+from src.app.config import get_config
 
 
 config = get_config().llm

@@ -4,7 +4,7 @@ import subprocess
 import sys
 import time
 
-from app.config import get_config
+from src.app.config import get_config
 
 config = get_config().api
 

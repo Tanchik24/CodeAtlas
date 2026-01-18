@@ -7,12 +7,12 @@ from typing import Any, Dict, List, Optional
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from db import SQLiteStoreSA
-from db import Repo, User
+from src.db import SQLiteStoreSA
+from src.db import Repo, User
 
-from app.RepoQAService import RepoQAService 
+from src.app.RepoQAService import RepoQAService 
 
-from app.config import get_config
+from src.app.config import get_config
 
 llm_config = get_config().llm
 db_config = get_config().gdb
