@@ -22,14 +22,14 @@ def main() -> None:
 
     api_cmd = [
         sys.executable, "-m", "uvicorn",
-        "app.api_app:app",
+        "src.app.api_app:app",
         "--host", api_host,
         "--port", str(api_port)
     ]
 
     ui_cmd = [
         sys.executable, "-m", "streamlit", "run",
-        "app/ui.py",
+        "src/app/ui.py",
         "--server.address", api_host,
         "--server.port", str(ui_port),
     ]
