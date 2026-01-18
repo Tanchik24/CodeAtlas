@@ -950,3 +950,31 @@ ________
 - Внутренний Git: clone
 - auth: выдача прав, сопоставление user (техдолг)
 - CI/Webhooks (техдолг): инкрементальная переиндексация на push/merge
+
+______
+
+## Load testing:
+### Setup
+- Repo: `https://github.com/huggingface/pytorch-image-models`
+- VUs: **16**
+- Duration: **15m**
+- Workload: closed-loop (Locust users with think-time)
+
+### Results (overall, /chat)
+- Total requests: ~4.8k
+- RPS avg: ~5.3
+- Errors: 0 (0.0%)
+- Latency (ms): p50 ~3000, p95 ~3400, p99 ~3800
+
+Avg latency (ms): ~3050
+
+### Charts
+![Throughput](throughput_rps_15m_16vus.png)
+![Errors](errors_per_sec_15m_16vus.png)
+![Latency](latency_avg_ms_15m_16vus.png)
+
+- В первые ~2-3 минуты заметен прогрев (рост throughput и падение latency после холодного старта)
+
+- Далее система выходит на стабильное плато: ~5-6 RPS при среднем времени ответа около ~3s
+
+- Наблюдаются редкие кратковременные колебания latency, без роста ошибок

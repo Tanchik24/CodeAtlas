@@ -1,7 +1,25 @@
 import argparse
 from pathlib import Path
+
 import pandas as pd
 import matplotlib.pyplot as plt
+
+
+def pick_col(df: pd.DataFrame, candidates: list[str]) -> str:
+    for c in candidates:
+        if c in df.columns:
+            return c
+    raise KeyError(f"None of these columns exist: {candidates}. Available: {list(df.columns)}")
+
+
+def safe_float(v, default=0.0) -> float:
+    try:
+        if pd.isna(v):
+            return float(default)
+        return float(v)
+    except Exception:
+        return float(default)
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -18,35 +36,44 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
 
     stats = pd.read_csv(str(prefix) + "_stats.csv")
-    hist  = pd.read_csv(str(prefix) + "_stats_history.csv")
+    hist = pd.read_csv(str(prefix) + "_stats_history.csv")
 
     row = stats[(stats["Name"] == "/chat") & (stats["Type"] == "POST")]
     if row.empty:
         row = stats[(stats["Name"] == "/chat")]
+    if row.empty:
+        raise ValueError("Could not find /chat row in stats csv")
     row = row.iloc[0]
 
-    total = int(row["Request Count"])
-    fails = int(row["Failure Count"])
+    total = int(row.get("Request Count", 0) or 0)
+    fails = int(row.get("Failure Count", 0) or 0)
     fail_rate = (fails / total) if total else 0.0
 
-    p50 = float(row.get("50%", row.get("Median Response Time", 0)))
-    p95 = float(row.get("95%", 0))
-    p99 = float(row.get("99%", 0))
-    avg = float(row.get("Average Response Time", 0))
-    rps_avg = float(row.get("Requests/s", 0))
+    p50 = safe_float(row.get("50%", row.get("Median Response Time", 0)))
+    p95 = safe_float(row.get("95%", 0))
+    p99 = safe_float(row.get("99%", 0))
+    avg = safe_float(row.get("Average Response Time", 0))
+    rps_avg = safe_float(row.get("Requests/s", 0))
+
+    ts_col = pick_col(hist, ["Timestamp"])
+    rps_col = pick_col(hist, ["Requests/s"])
+    failps_col = pick_col(hist, ["Failures/s"])
+    lat_col = pick_col(hist, ["Total Average Response Time", "Total Median Response Time"])
+
+    x = pd.to_datetime(hist[ts_col], unit="s", errors="coerce")
 
     plt.figure()
-    plt.plot(hist["Timestamp"], hist["Total RPS"])
-    plt.xlabel("timestamp")
+    plt.plot(x, hist[rps_col])
+    plt.xlabel("time")
     plt.ylabel("RPS")
-    plt.title("Throughput (Total RPS)")
+    plt.title("Throughput (Requests/s)")
     plt.tight_layout()
     plt.savefig(out_dir / "throughput_rps.png")
     plt.close()
 
     plt.figure()
-    plt.plot(hist["Timestamp"], hist["Total Failures/s"])
-    plt.xlabel("timestamp")
+    plt.plot(x, hist[failps_col])
+    plt.xlabel("time")
     plt.ylabel("Failures/s")
     plt.title("Errors per second")
     plt.tight_layout()
@@ -54,10 +81,10 @@ def main():
     plt.close()
 
     plt.figure()
-    plt.plot(hist["Timestamp"], hist["Total Average Response Time"])
-    plt.xlabel("timestamp")
+    plt.plot(x, hist[lat_col])
+    plt.xlabel("time")
     plt.ylabel("ms")
-    plt.title("Latency (avg) over time")
+    plt.title(f"Latency over time ({lat_col})")
     plt.tight_layout()
     plt.savefig(out_dir / "latency_avg_ms.png")
     plt.close()
@@ -73,8 +100,8 @@ def main():
 
 ### Results (overall, /chat)
 - Total requests: **{total}**
-- RPS avg: **{round(rps_avg, 2)}**
-- Errors: **{fails}** (**{round(fail_rate, 2)}**)
+- RPS avg: **{round(rps_avg, 3)}**
+- Errors: **{fails}** (**{round(fail_rate * 100, 2)}%**)
 - Latency (ms): p50 **{round(p50, 2)}**, p95 **{round(p95, 2)}**, p99 **{round(p99, 2)}**
 - Avg latency (ms): **{round(avg, 2)}**
 
@@ -85,6 +112,7 @@ def main():
 """
     (out_dir / "design_doc_load_test_section.md").write_text(md, encoding="utf-8")
     print("Wrote:", out_dir)
+
 
 if __name__ == "__main__":
     main()
