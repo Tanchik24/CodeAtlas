@@ -220,7 +220,7 @@ class RepoQAService:
             neo4j_ingestor=self.neo4j,
             store=emb_store,
             embedder=embedder,
-            model_name=self.model_name,
+            qwen_model=self.model_name,
             top_k=5,
         )
 
